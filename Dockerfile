@@ -13,11 +13,16 @@ RUN npm ci
 # Copia o restante do código
 COPY . .
 
-# Modifica o script de build para usar o comando 'cp' do Linux em vez de 'copy' do Windows
-RUN sed -i 's/copy .htaccess dist\\/cp .htaccess dist\//g' package.json
+# Não vamos mais modificar o package.json, em vez disso executaremos cada comando separadamente
 
-# Executa o build
-RUN npm run build
+# Executa a verificação do TypeScript
+RUN ./node_modules/.bin/tsc
+
+# Executa o build do Vite
+RUN ./node_modules/.bin/vite build
+
+# Copia o arquivo .htaccess para a pasta dist (não falha se o arquivo não existir)
+RUN cp .htaccess dist/ || true
 
 # Estágio de Produção
 FROM nginx:stable-alpine
