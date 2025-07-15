@@ -1,0 +1,21 @@
+<svg width="500" height="600" viewBox="0 0 500 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="personGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.3" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Silhueta de pessoa de negócios (simplificada) -->
+  <g fill="url(#personGradient)">
+    <!-- Cabeça -->
+    <circle cx="250" cy="100" r="60" />
+    
+    <!-- Corpo -->
+    <path d="M190,160 L310,160 L320,400 L280,500 L250,550 L220,500 L180,400 Z" />
+    
+    <!-- Braços -->
+    <path d="M190,160 L150,300 L140,320" stroke="#FFFFFF" stroke-width="30" fill="none" stroke-opacity="0.2" />
+    <path d="M310,160 L350,300 L360,320" stroke="#FFFFFF" stroke-width="30" fill="none" stroke-opacity="0.2" />
+  </g>
+</svg> 

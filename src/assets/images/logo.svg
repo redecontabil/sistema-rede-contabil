@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <!-- Elementos da flor de lótus -->
+  <!-- Pétala central (azul) -->
+  <path d="M100 20 C85 35, 85 65, 100 80 C115 65, 115 35, 100 20" fill="#049DBF" />
+  
+  <!-- Pétala esquerda (rosa) -->
+  <path d="M85 25 C70 35, 70 65, 85 80 C95 70, 95 35, 85 25" fill="#A61B67" />
+  
+  <!-- Pétala direita (rosa) -->
+  <path d="M115 25 C130 35, 130 65, 115 80 C105 70, 105 35, 115 25" fill="#D90B91" />
+  
+  <!-- Pontos superiores (azul) -->
+  <circle cx="94" cy="15" r="5" fill="#03658C" />
+  <circle cx="100" cy="10" r="5" fill="#03658C" />
+  <circle cx="106" cy="15" r="5" fill="#03658C" />
+  
+  <!-- Base/linha de água (azul claro) -->
+  <path d="M30 85 C70 70, 130 70, 170 85" stroke="#049DBF" stroke-width="3" fill="none" />
+</svg> 

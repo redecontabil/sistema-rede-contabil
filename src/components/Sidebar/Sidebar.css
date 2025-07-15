@@ -1,0 +1,283 @@
+/* Animações */
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 5px rgba(147, 51, 234, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(147, 51, 234, 0.3);
+  }
+}
+
+/* Estilos da Sidebar */
+.sidebar {
+  @apply relative bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800;
+}
+
+.sidebar-enter {
+  animation: slideIn 0.3s ease-out;
+}
+
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(147, 51, 234, 0.2), transparent);
+}
+
+/* Logo */
+.logo-container {
+  @apply relative overflow-hidden;
+  background: linear-gradient(135deg, #9333ea 0%, #6366f1 100%);
+}
+
+.logo-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
+  animation: rotate 8s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Menu Items */
+.menu-item {
+  @apply relative overflow-hidden rounded-xl backdrop-blur-sm text-gray-600 dark:text-gray-300;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-item:hover {
+  @apply transform scale-[1.02] text-black dark:text-black;
+  background: linear-gradient(
+    90deg,
+    rgba(147, 51, 234, 0.1),
+    rgba(147, 51, 234, 0.05) 50%,
+    transparent
+  );
+}
+
+.menu-item.active {
+  @apply bg-gradient-to-r from-purple-100 to-transparent
+    dark:from-purple-900/50 dark:to-transparent text-purple-600 dark:text-purple-400;
+  animation: pulseGlow 2s infinite;
+}
+
+.menu-item.active:hover {
+  @apply text-black dark:text-black;
+}
+
+.menu-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(transparent, #9333ea, transparent);
+  transform: scaleY(0);
+  transition: transform 0.3s;
+}
+
+.menu-item:hover::before,
+.menu-item.active::before {
+  transform: scaleY(1);
+}
+
+/* Ícones */
+.menu-icon {
+  @apply relative transition-transform duration-300;
+}
+
+.menu-item:hover .menu-icon {
+  @apply transform scale-110;
+}
+
+/* Efeito de glassmorphism no modo escuro */
+.dark .sidebar {
+  background: linear-gradient(to bottom, 
+    rgba(17, 24, 39, 0.95),
+    rgba(17, 24, 39, 0.85)
+  );
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Botões de ação (tema e logout) */
+.action-button {
+  @apply relative overflow-hidden rounded-xl;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: 0.5s;
+}
+
+.action-button:hover::after {
+  left: 100%;
+}
+
+/* Theme Toggle específico */
+.theme-toggle {
+  @apply transition-all duration-500;
+}
+
+.theme-toggle:hover {
+  @apply transform rotate-180 scale-110;
+  animation: pulseGlow 2s infinite;
+}
+
+/* Logout Button específico */
+.logout-button {
+  @apply transition-all duration-300;
+}
+
+.logout-button:hover {
+  @apply text-red-500 dark:text-red-400 transform scale-105;
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+/* Scrollbar personalizada */
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  @apply bg-purple-300/50 dark:bg-purple-600/50 rounded-full;
+  background: linear-gradient(
+    to bottom,
+    rgba(147, 51, 234, 0.5),
+    rgba(99, 102, 241, 0.5)
+  );
+}
+
+/* Tooltip personalizado */
+.menu-tooltip {
+  @apply absolute left-full ml-2 px-3 py-2 bg-gray-900 dark:bg-gray-800
+    text-white text-sm rounded-md opacity-0 invisible
+    transform -translate-x-2 scale-95
+    transition-all duration-200 z-50;
+  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+}
+
+.menu-item:hover .menu-tooltip {
+  @apply opacity-100 visible transform translate-x-0 scale-100;
+}
+
+/* Estilos da Sidebar */
+.sidebar-icon {
+  @apply relative flex items-center justify-center
+    h-12 w-12 mt-2 mb-2 mx-auto shadow-lg
+    bg-gray-100 dark:bg-gray-800 text-purple-600 dark:text-purple-300
+    hover:bg-purple-600 dark:hover:bg-purple-600 hover:text-white
+    rounded-3xl hover:rounded-xl
+    transition-all duration-300 ease-linear
+    cursor-pointer;
+}
+
+.sidebar-tooltip {
+  @apply absolute w-auto p-2 m-2 min-w-max left-14
+    rounded-md shadow-md text-white bg-gray-900
+    text-xs font-bold transition-all duration-100 scale-0
+    origin-left;
+}
+
+.sidebar-icon:hover .sidebar-tooltip {
+  @apply scale-100;
+}
+
+/* Efeitos de hover nos itens do menu */
+.menu-item {
+  @apply relative overflow-hidden;
+}
+
+.menu-item::after {
+  content: '';
+  @apply absolute bottom-0 left-0 w-full h-0.5
+    bg-purple-600 dark:bg-purple-400
+    transform scale-x-0 transition-transform duration-300;
+}
+
+.menu-item:hover::after {
+  @apply scale-x-100;
+}
+
+/* Animação do toggle do tema */
+.theme-toggle {
+  @apply transition-transform duration-500;
+}
+
+.theme-toggle:hover {
+  @apply transform rotate-180;
+}
+
+/* Estilo para item ativo do menu */
+.menu-item.active {
+  @apply bg-purple-100 dark:bg-purple-900
+    text-purple-600 dark:text-purple-300
+    font-medium;
+}
+
+/* Scrollbar personalizada */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 dark:bg-gray-600 rounded-full;
+}
+
+/* Efeito de hover no botão de logout */
+.logout-button:hover {
+  @apply text-red-600 dark:text-red-400
+    transform scale-105
+    transition-all duration-300;
+} 
