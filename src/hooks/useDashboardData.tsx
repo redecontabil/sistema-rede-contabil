@@ -42,6 +42,8 @@ export interface KpiAnalytics {
 export interface StatsData {
   propostasEntrada: string;
   propostasSaida: string;
+  propostasEntradaAnual: string;
+  propostasSaidaAnual: string;
   taxaConversao: string;
   taxaChurn: string;
   honorariosAprovados: string;
@@ -126,6 +128,8 @@ export function useDashboardData() {
   const [statsData, setStatsData] = useState<StatsData>({
     propostasEntrada: "0",
     propostasSaida: "0",
+    propostasEntradaAnual: "0",
+    propostasSaidaAnual: "0",
     taxaConversao: "0%",
     taxaChurn: "0%",
     honorariosAprovados: "R$ 0",
@@ -200,30 +204,105 @@ export function useDashboardData() {
       
       console.log(`Valores atuais dos filtros: Mês=${currentMonth}, Ano=${currentYear}`);
 
-      let queryPropostas = supabase
-        .from("propostas")
-        .select("*");
-
-      let queryPropostasSaida = supabase
-        .from("propostas_saida")
-        .select("*");
+      // Consultas para dados mensais
+      let queryPropostas;
+      let queryPropostasSaida;
+      
+      // Consultas para dados anuais
+      let queryPropostasAnual;
+      let queryPropostasSaidaAnual;
 
       // Aplicar filtro de data apenas se não estiver no modo "todos os dados"
       if (currentMonth !== 0 && currentYear !== 0) {
-        // Garantir que estamos usando o último dia do mês corretamente
+        // Formatar datas como strings no formato YYYY-MM-DD para o filtro
+        // Primeiro dia do mês
         const startDate = new Date(currentYear, currentMonth - 1, 1);
-        // Obter o último dia do mês selecionado
+        // Último dia do mês
         const lastDay = new Date(currentYear, currentMonth, 0).getDate();
-        const endDate = new Date(currentYear, currentMonth - 1, lastDay, 23, 59, 59);
+        const endDate = new Date(currentYear, currentMonth - 1, lastDay);
         
-        const startDateISO = startDate.toISOString();
-        const endDateISO = endDate.toISOString();
+        // Converter para formato YYYY-MM-DD
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
         
-        console.log(`Aplicando filtro de data: ${startDateISO} até ${endDateISO}`);
-        queryPropostas = queryPropostas.gte('data', startDateISO).lte('data', endDateISO);
-        queryPropostasSaida = queryPropostasSaida.gte('data', startDateISO).lte('data', endDateISO);
+        console.log(`Aplicando filtro de data: ${startDateStr} até ${endDateStr}`);
+        
+        // Filtrar propostas de entrada pela data_inicio (coluna "Início Em")
+        // Exatamente como é feito na página de Proposta
+        queryPropostas = supabase
+          .from("propostas")
+          .select("*")
+          .eq('status', 'aprovado')
+          .not('data_inicio', 'is', null)
+          .gte('data_inicio', startDateStr)
+          .lte('data_inicio', endDateStr);
+          
+        queryPropostasSaida = supabase
+          .from("propostas_saida")
+          .select("*")
+          .gte('data', startDateStr)
+          .lte('data', endDateStr);
+
+        // Para dados anuais, filtramos apenas pelo ano
+        const startYearDate = new Date(currentYear, 0, 1);
+        const endYearDate = new Date(currentYear, 11, 31);
+        
+        const startYearStr = startYearDate.toISOString().split('T')[0];
+        const endYearStr = endYearDate.toISOString().split('T')[0];
+        
+        console.log(`Aplicando filtro anual: ${startYearStr} até ${endYearStr}`);
+        
+        // Filtrar propostas de entrada anuais pela data_inicio (coluna "Início Em")
+        queryPropostasAnual = supabase
+          .from("propostas")
+          .select("*")
+          .eq('status', 'aprovado')
+          .not('data_inicio', 'is', null)
+          .gte('data_inicio', startYearStr)
+          .lte('data_inicio', endYearStr);
+          
+        queryPropostasSaidaAnual = supabase
+          .from("propostas_saida")
+          .select("*")
+          .gte('data', startYearStr)
+          .lte('data', endYearStr);
       } else {
         console.log('Sem filtro de data aplicado - mostrando todos os dados');
+        // Se não há filtro específico, usamos o ano atual para dados anuais
+        const currentDate = new Date();
+        const currentYearValue = currentDate.getFullYear();
+        const startYearDate = new Date(currentYearValue, 0, 1);
+        const endYearDate = new Date(currentYearValue, 11, 31);
+        
+        const startYearStr = startYearDate.toISOString().split('T')[0];
+        const endYearStr = endYearDate.toISOString().split('T')[0];
+        
+        console.log(`Aplicando filtro anual padrão: ${startYearStr} até ${endYearStr}`);
+        
+        // Consultas sem filtro de mês
+        queryPropostas = supabase
+          .from("propostas")
+          .select("*")
+          .eq('status', 'aprovado');
+          
+        queryPropostasSaida = supabase
+          .from("propostas_saida")
+          .select("*");
+          
+        // Filtrar propostas de entrada anuais pela data_inicio (coluna "Início Em")
+        queryPropostasAnual = supabase
+          .from("propostas")
+          .select("*")
+          .eq('status', 'aprovado')
+          .not('data_inicio', 'is', null)
+          .gte('data_inicio', startYearStr)
+          .lte('data_inicio', endYearStr);
+          
+        queryPropostasSaidaAnual = supabase
+          .from("propostas_saida")
+          .select("*")
+          .gte('data', startYearStr)
+          .lte('data', endYearStr);
       }
 
       // Consulta para propostas de entrada
@@ -231,10 +310,16 @@ export function useDashboardData() {
 
       // Consulta para propostas de saída
       let { data: propostasSaidaData, error: propostasSaidaError } = await queryPropostasSaida;
+
+      // Consulta para propostas de entrada anuais
+      let { data: propostasAnualData, error: propostasAnualError } = await queryPropostasAnual;
+
+      // Consulta para propostas de saída anuais
+      let { data: propostasSaidaAnualData, error: propostasSaidaAnualError } = await queryPropostasSaidaAnual;
       
       // Verificar se houve erro nas consultas
-      if (propostasError || propostasSaidaError) {
-        console.error('Erro ao buscar propostas:', { propostasError, propostasSaidaError });
+      if (propostasError || propostasSaidaError || propostasAnualError || propostasSaidaAnualError) {
+        console.error('Erro ao buscar propostas:', { propostasError, propostasSaidaError, propostasAnualError, propostasSaidaAnualError });
         toast.error('Erro ao carregar dados do dashboard');
         return null;
       }
@@ -242,10 +327,31 @@ export function useDashboardData() {
       // Usar dados disponíveis ou valores padrão
       const propostas = propostasData || [];
       const propostasSaida = propostasSaidaData || [];
+      const propostasAnual = propostasAnualData || [];
+      const propostasSaidaAnual = propostasSaidaAnualData || [];
+      
+      // Log detalhado para depuração
+      console.log('Propostas mensais detalhadas (filtradas por data_inicio):', propostas.map(p => ({
+        id: p.id,
+        cliente: p.cliente,
+        status: p.status,
+        data_inicio: p.data_inicio,
+        data: p.data
+      })));
+      
+      console.log('Propostas anuais detalhadas (filtradas por data_inicio):', propostasAnual.map(p => ({
+        id: p.id,
+        cliente: p.cliente,
+        status: p.status,
+        data_inicio: p.data_inicio,
+        data: p.data
+      })));
       
       console.log('Dados brutos recuperados:', { 
         totalPropostas: propostas.length, 
-        totalSaidas: propostasSaida.length 
+        totalSaidas: propostasSaida.length,
+        totalPropostasAnual: propostasAnual.length,
+        totalSaidasAnual: propostasSaidaAnual.length
       });
       
       // Função auxiliar para converter valores monetários
@@ -261,16 +367,20 @@ export function useDashboardData() {
       };
 
       // Cálculos para propostas de entrada
-      const totalEntrada = propostas.filter(p => 
-        p.status?.toString().toLowerCase() === "aprovado"
-      ).length;
-      const propostasAprovadas = propostas.filter(p => 
-        p.status?.toString().toLowerCase() === "aprovado"
-      );
+      // Não precisamos mais filtrar por status aprovado, pois já foi feito na consulta
+      const totalEntrada = propostas.length;
+      const propostasAprovadas = propostas; // Todas já são aprovadas
       const aprovadas = propostasAprovadas.length;
       
       // Cálculos para propostas de saída
       const totalSaida = propostasSaida.length;
+
+      // Cálculos para propostas de entrada anuais
+      // Não precisamos mais filtrar por status aprovado, pois já foi feito na consulta
+      const totalEntradaAnual = propostasAnual.length;
+      
+      // Cálculos para propostas de saída anuais
+      const totalSaidaAnual = propostasSaidaAnual.length;
       
       // Cálculo de perdas totais
       const perdasTotais = propostasSaida.reduce((acc, p) => {
@@ -311,7 +421,9 @@ export function useDashboardData() {
         totalComissao,
         honorariosAprovados,
         perdasTotais,
-        taxaChurn
+        taxaChurn,
+        totalEntradaAnual,
+        totalSaidaAnual
       });
 
       const lucroProjetado = totalHonorario - totalComissao;
@@ -321,6 +433,8 @@ export function useDashboardData() {
       const newStatsData = {
         propostasEntrada: totalEntrada.toString(),
         propostasSaida: totalSaida.toString(),
+        propostasEntradaAnual: totalEntradaAnual.toString(),
+        propostasSaidaAnual: totalSaidaAnual.toString(),
         taxaConversao: taxaConversao.replace('.', ','),
         taxaChurn: `${taxaChurn.toFixed(1).replace('.', ',')}%`,
         honorariosAprovados: formatCurrency(honorariosAprovados),
@@ -342,6 +456,8 @@ export function useDashboardData() {
       const defaultStats = {
         propostasEntrada: "0",
         propostasSaida: "0",
+        propostasEntradaAnual: "0",
+        propostasSaidaAnual: "0",
         taxaConversao: "0%",
         taxaChurn: "0%",
         honorariosAprovados: "R$ 0,00",

@@ -1,24 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type StatCardProps = {
   title: string;
   value: string;
+  secondaryValue?: string;
   description: string;
   icon: React.ReactNode;
   isLoading?: boolean;
   className?: string;
+  showSecondary?: boolean;
+  secondaryLabel?: string;
+  primaryLabel?: string;
 };
 
 const StatCard = ({ 
   title, 
   value, 
+  secondaryValue,
   description, 
   icon, 
   isLoading = false,
-  className
+  className,
+  showSecondary = false,
+  secondaryLabel = "Anual",
+  primaryLabel = "Mensal"
 }: StatCardProps) => {
+  const [activeView, setActiveView] = useState<'primary' | 'secondary'>('primary');
+  
   return (
     <div className={cn(
       "group flex flex-col overflow-hidden transition-all duration-200 h-full rounded-xl border shadow-sm",
@@ -55,8 +65,43 @@ const StatCard = ({
           </>
         ) : (
           <>
-            <div className="text-[26px] font-bold mb-1">{value}</div>
-            <p className="text-sm text-muted-foreground">{description}</p>
+            {showSecondary ? (
+              <div className="flex flex-col space-y-2">
+                <div className="text-[26px] font-bold mb-1">
+                  {activeView === 'primary' ? value : secondaryValue}
+                </div>
+                <p className="text-sm text-muted-foreground">{description}</p>
+                <div className="flex mt-auto border rounded-md overflow-hidden">
+                  <button
+                    onClick={() => setActiveView('primary')}
+                    className={cn(
+                      "flex-1 text-xs py-1 px-2 transition-colors",
+                      activeView === 'primary' 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted hover:bg-muted/80"
+                    )}
+                  >
+                    {primaryLabel}
+                  </button>
+                  <button
+                    onClick={() => setActiveView('secondary')}
+                    className={cn(
+                      "flex-1 text-xs py-1 px-2 transition-colors",
+                      activeView === 'secondary' 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted hover:bg-muted/80"
+                    )}
+                  >
+                    {secondaryLabel}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-[26px] font-bold mb-1">{value}</div>
+                <p className="text-sm text-muted-foreground">{description}</p>
+              </>
+            )}
           </>
         )}
       </div>

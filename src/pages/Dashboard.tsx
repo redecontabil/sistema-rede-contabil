@@ -206,18 +206,26 @@ export default function Dashboard() {
         <StatCard 
           title="Propostas de Entrada" 
           value={statsData.propostasEntrada} 
+          secondaryValue={statsData.propostasEntradaAnual}
           description="Total no período atual" 
           icon={<ArrowUpCircle className="h-4 w-4 text-emerald-500" />} 
           isLoading={isRefreshing || !dataLoaded}
-          className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-100 dark:border-emerald-900/30" 
+          className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-100 dark:border-emerald-900/30"
+          showSecondary={true}
+          primaryLabel="Mensal"
+          secondaryLabel="Anual"
         />
         <StatCard 
           title="Propostas de Saída" 
           value={statsData.propostasSaida} 
+          secondaryValue={statsData.propostasSaidaAnual}
           description="Total no período atual" 
           icon={<ArrowDownCircle className="h-4 w-4 text-rose-500" />} 
           isLoading={isRefreshing || !dataLoaded}
-          className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30 border-rose-100 dark:border-rose-900/30" 
+          className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30 border-rose-100 dark:border-rose-900/30"
+          showSecondary={true}
+          primaryLabel="Mensal"
+          secondaryLabel="Anual"
         />
         {/* Segunda linha: Lucro Projetado e Margem */}
         <StatCard 
