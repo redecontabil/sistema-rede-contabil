@@ -38,19 +38,59 @@ const StatCard = ({
       "border-slate-200 dark:border-slate-800",
       className
     )}>
-      {/* Cabeçalho com ícone e título */}
-      <div className="p-4 flex items-center gap-3">
-        <div className={cn(
-          "h-10 w-10 rounded-lg flex items-center justify-center",
-          "bg-white shadow-sm transition-colors duration-200",
-          "dark:bg-slate-800 group-hover:shadow-md",
-          "border border-slate-200 dark:border-slate-700"
-        )}>
-          {icon}
+      {/* Cabeçalho com ícone, título e seletor de abas */}
+      <div className="p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "h-10 w-10 rounded-lg flex items-center justify-center",
+            "bg-white shadow-sm transition-colors duration-200",
+            "dark:bg-slate-800 group-hover:shadow-md",
+            "border border-slate-200 dark:border-slate-700"
+          )}>
+            {icon}
+          </div>
+          <h3 className="text-sm font-semibold tracking-tight">
+            {title}
+          </h3>
         </div>
-        <h3 className="text-sm font-semibold tracking-tight">
-          {title}
-        </h3>
+        
+        {/* Seletor de abas com bolinhas */}
+        {showSecondary && (
+          <div className="flex items-center gap-1 rounded-full bg-slate-100/80 dark:bg-slate-800/80 p-0.5">
+            <button
+              onClick={() => setActiveView('primary')}
+              className={cn(
+                "text-xs px-2.5 py-0.5 rounded-full transition-all",
+                "flex items-center gap-1",
+                activeView === 'primary' 
+                  ? "bg-white dark:bg-slate-700 shadow-sm text-primary font-medium" 
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+              )}
+            >
+              <div className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                activeView === 'primary' ? "bg-primary" : "bg-slate-300 dark:bg-slate-600"
+              )}></div>
+              {primaryLabel}
+            </button>
+            <button
+              onClick={() => setActiveView('secondary')}
+              className={cn(
+                "text-xs px-2.5 py-0.5 rounded-full transition-all",
+                "flex items-center gap-1",
+                activeView === 'secondary' 
+                  ? "bg-white dark:bg-slate-700 shadow-sm text-primary font-medium" 
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+              )}
+            >
+              <div className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                activeView === 'secondary' ? "bg-primary" : "bg-slate-300 dark:bg-slate-600"
+              )}></div>
+              {secondaryLabel}
+            </button>
+          </div>
+        )}
       </div>
       
       {/* Conteúdo principal */}
@@ -59,42 +99,15 @@ const StatCard = ({
           <>
             <Skeleton className="h-10 w-3/4 mb-3" />
             <Skeleton className="h-4 w-1/2 mb-3" />
-            <div className="flex items-center mt-auto">
-              <Skeleton className="h-6 w-36" />
-            </div>
           </>
         ) : (
           <>
             {showSecondary ? (
               <div className="flex flex-col space-y-2">
-                <div className="text-[26px] font-bold mb-1">
+                <div className="text-[26px] font-bold mb-1 transition-all duration-300 ease-in-out">
                   {activeView === 'primary' ? value : secondaryValue}
                 </div>
                 <p className="text-sm text-muted-foreground">{description}</p>
-                <div className="flex mt-auto border rounded-md overflow-hidden">
-                  <button
-                    onClick={() => setActiveView('primary')}
-                    className={cn(
-                      "flex-1 text-xs py-1 px-2 transition-colors",
-                      activeView === 'primary' 
-                        ? "bg-primary text-primary-foreground" 
-                        : "bg-muted hover:bg-muted/80"
-                    )}
-                  >
-                    {primaryLabel}
-                  </button>
-                  <button
-                    onClick={() => setActiveView('secondary')}
-                    className={cn(
-                      "flex-1 text-xs py-1 px-2 transition-colors",
-                      activeView === 'secondary' 
-                        ? "bg-primary text-primary-foreground" 
-                        : "bg-muted hover:bg-muted/80"
-                    )}
-                  >
-                    {secondaryLabel}
-                  </button>
-                </div>
               </div>
             ) : (
               <>
