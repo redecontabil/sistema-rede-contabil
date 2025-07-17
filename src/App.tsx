@@ -12,7 +12,7 @@ import NotFound from "./pages/NotFound";
 import Proposta from "./pages/Proposta";
 import Custo from "./pages/Custo";
 import Balanco from "./pages/Balanco";
-import Bonificacao from "./pages/HistoricoFechamento";
+import Bonificacao from "./pages/Bonificacao";
 import { useEffect, useState } from "react";
 import { useInactivityTimer } from "./hooks/useInactivityTimer";
 import { toast } from "./components/ui/use-toast";
