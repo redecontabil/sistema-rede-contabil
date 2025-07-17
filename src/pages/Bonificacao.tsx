@@ -333,11 +333,11 @@ export default function Bonificacao() {
   const totalAnual = bonificacaoData.totalPrimeiroSemestre + bonificacaoData.totalSegundoSemestre;
 
   return (
-    <div className="space-y-6 px-4 md:px-8 py-6 pb-16">
+    <div className="space-y-6 pb-16">
       {/* Cabeçalho da página */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bonificações</h1>
+          <h1 className="text-3xl font-bold tracking-tight mb-1">Bonificações</h1>
           <p className="text-muted-foreground">
             Gerencie as bonificações dos funcionários por ano
           </p>
