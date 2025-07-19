@@ -99,6 +99,15 @@ const DashboardHeader = ({
     limparFiltros();
   };
 
+  // Nova função para aplicar filtros e fechar o popup
+  const handleAplicarFiltros = () => {
+    // Aplicar filtros
+    aplicarFiltros();
+    
+    // Fechar o popup
+    setFilterDialogOpen(false);
+  };
+
   // Determinar se os filtros estão ativos
   const filtrosAtivos = selectedMonth !== 0 && selectedYear !== 0 || 
                        filtroDataInicioEmpresa !== "" || 
@@ -128,7 +137,7 @@ const DashboardHeader = ({
         
         {/* Filtros temporais */}
         <div className="flex items-center gap-4">
-          <Popover>
+          <Popover open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="gap-2 hover:bg-primary hover:text-white transition-colors">
                 <Filter className="h-4 w-4" />
@@ -147,7 +156,7 @@ const DashboardHeader = ({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="dataInicioEmpresa" className="text-sm font-medium">
-                          Data Início Empresa
+                          Data Início
                         </Label>
                         <Input
                           type="date"
@@ -159,7 +168,7 @@ const DashboardHeader = ({
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="dataFimEmpresa" className="text-sm font-medium">
-                          Data Fim Empresa
+                          Data Fim
                         </Label>
                         <Input
                           type="date"
@@ -196,7 +205,7 @@ const DashboardHeader = ({
                     Limpar
                   </Button>
                   <Button 
-                    onClick={aplicarFiltros}
+                    onClick={handleAplicarFiltros}
                     className="hover:bg-primary/90 transition-colors"
                   >
                     Aplicar Filtros
