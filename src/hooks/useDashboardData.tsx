@@ -1100,6 +1100,13 @@ export function useDashboardData() {
   // Função para limpar filtros
   const limparFiltros = useCallback(() => {
     console.log('Limpando todos os filtros...');
+    console.log('Estado anterior dos filtros:', {
+      selectedMonth,
+      selectedYear,
+      filtroDataInicioEmpresa,
+      filtroDataFimEmpresa,
+      filtroSemDataInicio
+    });
     
     // Limpar filtros de mês e ano
     setSelectedMonth(0);
@@ -1110,9 +1117,19 @@ export function useDashboardData() {
     setFiltroDataFimEmpresa("");
     setFiltroSemDataInicio(false);
     
-    // Atualizar dados sem filtros
-    updateDashboardData();
-  }, [updateDashboardData, setSelectedMonth, setSelectedYear, setFiltroDataInicioEmpresa, setFiltroDataFimEmpresa, setFiltroSemDataInicio]);
+    // Log após limpar os filtros
+    console.log('Filtros limpos com sucesso!');
+    
+    // Forçar atualização imediata dos dados sem filtros
+    // Usar setTimeout com 0ms para garantir que os estados sejam atualizados antes de chamar updateDashboardData
+    setTimeout(() => {
+      // Atualizar dados sem filtros
+      updateDashboardData();
+      
+      // Mostrar toast de confirmação
+      toast.success('Todos os filtros foram limpos');
+    }, 0);
+  }, [updateDashboardData, setSelectedMonth, setSelectedYear, setFiltroDataInicioEmpresa, setFiltroDataFimEmpresa, setFiltroSemDataInicio, selectedMonth, selectedYear, filtroDataInicioEmpresa, filtroDataFimEmpresa, filtroSemDataInicio]);
 
   // Retornar estados e funções
   return {

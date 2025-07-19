@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Eraser, Filter } from "lucide-react";
+import { Filter } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -87,6 +87,14 @@ const DashboardHeader = ({
 
   const handleLimparFiltros = () => {
     console.log('Botão de limpar filtros clicado');
+    
+    // Limpar os estados locais diretamente para garantir uma resposta imediata
+    setFiltroDataInicioEmpresa("");
+    setFiltroDataFimEmpresa("");
+    setFiltroSemDataInicio(false);
+    setSelectedMonth(0);
+    setSelectedYear(0);
+    
     // Chamar a função de limpar filtros passada como prop
     limparFiltros();
   };
@@ -134,127 +142,55 @@ const DashboardHeader = ({
                     <Filter className="h-4 w-4" />
                     Filtros
                   </h4>
-                  <Tabs defaultValue="periodo" className="w-full">
-                    <TabsList className="w-full mb-4 grid grid-cols-2">
-                      <TabsTrigger value="periodo">Período</TabsTrigger>
-                      <TabsTrigger value="dataEmpresa">Data Empresa</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="periodo" className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="mes" className="text-sm font-medium">
-                            Mês
+                  <div className="space-y-4">
+                    <h5 className="text-md font-medium mb-2">Período</h5>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="dataInicioEmpresa" className="text-sm font-medium">
+                          Data Início Empresa
+                        </Label>
+                        <Input
+                          type="date"
+                          id="dataInicioEmpresa"
+                          value={filtroDataInicioEmpresa}
+                          onChange={(e) => setFiltroDataInicioEmpresa(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="dataFimEmpresa" className="text-sm font-medium">
+                          Data Fim Empresa
+                        </Label>
+                        <Input
+                          type="date"
+                          id="dataFimEmpresa"
+                          value={filtroDataFimEmpresa}
+                          onChange={(e) => setFiltroDataFimEmpresa(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      
+                      {/* Removendo o checkbox "Sem data de início"
+                      <div className="col-span-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="semDataInicio"
+                            checked={filtroSemDataInicio}
+                            onCheckedChange={(checked) => setFiltroSemDataInicio(checked as boolean)}
+                          />
+                          <Label htmlFor="semDataInicio" className="text-sm font-medium">
+                            Sem data de início
                           </Label>
-                          <Select
-                            value={selectedMonth !== 0 ? selectedMonth.toString() : ""}
-                            onValueChange={(value) => {
-                              const monthValue = parseInt(value);
-                              if (selectedYear === 0) {
-                                const currentYear = new Date().getFullYear();
-                                setSelectedMonth(monthValue);
-                                setSelectedYear(currentYear);
-                              } else {
-                                setSelectedMonth(monthValue);
-                              }
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o mês" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {MONTHS.map((month) => (
-                                  <SelectItem key={month.value} value={month.value.toString()}>
-                                    {month.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="ano" className="text-sm font-medium">
-                            Ano
-                          </Label>
-                          <Select
-                            value={selectedYear !== 0 ? selectedYear.toString() : ""}
-                            onValueChange={(value) => {
-                              const yearValue = parseInt(value);
-                              if (selectedMonth === 0) {
-                                const currentMonth = new Date().getMonth() + 1;
-                                setSelectedYear(yearValue);
-                                setSelectedMonth(currentMonth);
-                              } else {
-                                setSelectedYear(yearValue);
-                              }
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o ano" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {YEARS.map((year) => (
-                                  <SelectItem key={year} value={year.toString()}>
-                                    {year}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
                         </div>
                       </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="dataEmpresa" className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="dataInicioEmpresa" className="text-sm font-medium">
-                            Data Início Empresa
-                          </Label>
-                          <Input
-                            type="date"
-                            id="dataInicioEmpresa"
-                            value={filtroDataInicioEmpresa}
-                            onChange={(e) => setFiltroDataInicioEmpresa(e.target.value)}
-                            className="w-full"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="dataFimEmpresa" className="text-sm font-medium">
-                            Data Fim Empresa
-                          </Label>
-                          <Input
-                            type="date"
-                            id="dataFimEmpresa"
-                            value={filtroDataFimEmpresa}
-                            onChange={(e) => setFiltroDataFimEmpresa(e.target.value)}
-                            className="w-full"
-                          />
-                        </div>
-                        
-                        <div className="col-span-2">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="semDataInicio"
-                              checked={filtroSemDataInicio}
-                              onCheckedChange={(checked) => setFiltroSemDataInicio(checked as boolean)}
-                            />
-                            <Label htmlFor="semDataInicio" className="text-sm font-medium">
-                              Sem data de início
-                            </Label>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
+                      */}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t">
                   <Button 
                     variant="outline" 
-                    onClick={limparFiltros}
+                    onClick={handleLimparFiltros}
                     className="hover:bg-destructive hover:text-destructive-foreground transition-colors"
                   >
                     Limpar
@@ -269,123 +205,8 @@ const DashboardHeader = ({
               </div>
             </PopoverContent>
           </Popover>
-
-          <Select
-            value={selectedMonth !== 0 ? selectedMonth.toString() : ""}
-            onValueChange={(value) => {
-              console.log('Selecionando mês:', value);
-              // Primeiro atualizamos o estado
-              const monthValue = parseInt(value);
-              
-              // Se o ano não estiver definido, usar o ano atual
-              if (selectedYear === 0) {
-                const currentYear = new Date().getFullYear();
-                console.log('Definindo ano atual:', currentYear);
-                
-                // Atualizar ambos os estados de uma vez
-                setSelectedMonth(monthValue);
-                setSelectedYear(currentYear);
-                
-                // Aplicar filtros após um pequeno delay
-                setTimeout(() => {
-                  console.log('Aplicando filtros após selecionar mês e definir ano:', { 
-                    selectedMonth: monthValue, 
-                    selectedYear: currentYear 
-                  });
-                  aplicarFiltros();
-                }, 50);
-              } else {
-                // Apenas atualizar o mês e aplicar filtros
-                setSelectedMonth(monthValue);
-                
-                // Aplicar filtros após um pequeno delay
-                setTimeout(() => {
-                  console.log('Aplicando filtros após selecionar apenas mês:', { 
-                    selectedMonth: monthValue, 
-                    selectedYear 
-                  });
-                  aplicarFiltros();
-                }, 50);
-              }
-            }}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Selecione o mês" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {MONTHS.map((month) => (
-                  <SelectItem key={month.value} value={month.value.toString()}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={selectedYear !== 0 ? selectedYear.toString() : ""}
-            onValueChange={(value) => {
-              console.log('Selecionando ano:', value);
-              // Primeiro atualizamos o estado
-              const yearValue = parseInt(value);
-              
-              // Se o mês não estiver definido, usar o mês atual
-              if (selectedMonth === 0) {
-                const currentMonth = new Date().getMonth() + 1;
-                console.log('Definindo mês atual:', currentMonth);
-                
-                // Atualizar ambos os estados de uma vez
-                setSelectedYear(yearValue);
-                setSelectedMonth(currentMonth);
-                
-                // Aplicar filtros após um pequeno delay
-                setTimeout(() => {
-                  console.log('Aplicando filtros após selecionar ano e definir mês:', { 
-                    selectedMonth: currentMonth, 
-                    selectedYear: yearValue 
-                  });
-                  aplicarFiltros();
-                }, 50);
-              } else {
-                // Apenas atualizar o ano e aplicar filtros
-                setSelectedYear(yearValue);
-                
-                // Aplicar filtros após um pequeno delay
-                setTimeout(() => {
-                  console.log('Aplicando filtros após selecionar apenas ano:', { 
-                    selectedMonth, 
-                    selectedYear: yearValue 
-                  });
-                  aplicarFiltros();
-                }, 50);
-              }
-            }}
-          >
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Selecione o ano" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {YEARS.map((year) => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleLimparFiltros}
-            title="Limpar filtros"
-            className={`hover:bg-muted transition-colors ${!filtrosAtivos ? 'text-muted-foreground' : ''}`}
-            disabled={!filtrosAtivos}
-          >
-            <Eraser className="h-4 w-4" />
-          </Button>
+          
+          {/* Removidos os botões de atualização e limpar filtros */}
         </div>
       </div>
     </>
