@@ -167,6 +167,10 @@ export function useDashboardData() {
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filtroDataInicio, setFiltroDataInicio] = useState<Date | undefined>(undefined);
   const [filtroDataFim, setFiltroDataFim] = useState<Date | undefined>(undefined);
+  // Novos filtros para data de início da empresa
+  const [filtroDataInicioEmpresa, setFiltroDataInicioEmpresa] = useState<string>("");
+  const [filtroDataFimEmpresa, setFiltroDataFimEmpresa] = useState<string>("");
+  const [filtroSemDataInicio, setFiltroSemDataInicio] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState("month");
   
   // Novo estado para filtro temporal - iniciando com 0 para mostrar todos os dados
@@ -175,6 +179,14 @@ export function useDashboardData() {
   
   // Referência para controlar se dados já foram carregados
   const initialLoadComplete = useRef(false);
+
+  // Função auxiliar para ajustar o fuso horário para Brasília
+  const ajustarDataFusoBrasilia = (dataStr: string | null) => {
+    if (!dataStr) return null;
+    // Cria a data no formato ISO com o fuso horário de Brasília (GMT-3)
+    const data = new Date(dataStr + 'T12:00:00-03:00');
+    return data.toISOString().split('T')[0];
+  };
 
   // Função para filtrar dados por mês e ano - otimizada para evitar recálculos desnecessários
   const filterDataByDate = useCallback((data: any[], dateField: string) => {
@@ -197,6 +209,7 @@ export function useDashboardData() {
     try {
       console.log('Buscando indicadores do Supabase...');
       console.log(`Filtro temporal: ${selectedMonth}/${selectedYear}`);
+      console.log(`Filtro data empresa: ${filtroDataInicioEmpresa} até ${filtroDataFimEmpresa}, Sem data: ${filtroSemDataInicio}`);
 
       // Obter os valores atuais dos filtros para garantir consistência
       const currentMonth = selectedMonth;
@@ -232,10 +245,7 @@ export function useDashboardData() {
         queryPropostas = supabase
           .from("propostas")
           .select("*")
-          .eq('status', 'aprovado')
-          .not('data_inicio', 'is', null)
-          .gte('data_inicio', startDateStr)
-          .lte('data_inicio', endDateStr);
+          .eq('status', 'aprovado');
           
         queryPropostasSaida = supabase
           .from("propostas_saida")
@@ -256,10 +266,7 @@ export function useDashboardData() {
         queryPropostasAnual = supabase
           .from("propostas")
           .select("*")
-          .eq('status', 'aprovado')
-          .not('data_inicio', 'is', null)
-          .gte('data_inicio', startYearStr)
-          .lte('data_inicio', endYearStr);
+          .eq('status', 'aprovado');
           
         queryPropostasSaidaAnual = supabase
           .from("propostas_saida")
@@ -303,6 +310,35 @@ export function useDashboardData() {
           .select("*")
           .gte('data', startYearStr)
           .lte('data', endYearStr);
+      }
+      
+      // Aplicar filtros de data de início da empresa para propostas de entrada
+      if (filtroDataInicioEmpresa) {
+        // Ajustar a data do filtro para o fuso horário de Brasília
+        const dataInicioEmpresaAjustada = ajustarDataFusoBrasilia(filtroDataInicioEmpresa);
+        queryPropostas = queryPropostas.gte('data_inicio', dataInicioEmpresaAjustada);
+        queryPropostasAnual = queryPropostasAnual.gte('data_inicio', dataInicioEmpresaAjustada);
+        
+        // Também aplicar o filtro nas propostas de saída usando a coluna 'data'
+        queryPropostasSaida = queryPropostasSaida.gte('data', dataInicioEmpresaAjustada);
+        queryPropostasSaidaAnual = queryPropostasSaidaAnual.gte('data', dataInicioEmpresaAjustada);
+      }
+      
+      if (filtroDataFimEmpresa) {
+        // Ajustar a data do filtro para o fuso horário de Brasília
+        const dataFimEmpresaAjustada = ajustarDataFusoBrasilia(filtroDataFimEmpresa);
+        queryPropostas = queryPropostas.lte('data_inicio', dataFimEmpresaAjustada);
+        queryPropostasAnual = queryPropostasAnual.lte('data_inicio', dataFimEmpresaAjustada);
+        
+        // Também aplicar o filtro nas propostas de saída usando a coluna 'data'
+        queryPropostasSaida = queryPropostasSaida.lte('data', dataFimEmpresaAjustada);
+        queryPropostasSaidaAnual = queryPropostasSaidaAnual.lte('data', dataFimEmpresaAjustada);
+      }
+      
+      // Filtro para propostas sem data de início
+      if (filtroSemDataInicio) {
+        queryPropostas = queryPropostas.is('data_inicio', null);
+        queryPropostasAnual = queryPropostasAnual.is('data_inicio', null);
       }
 
       // Consulta para propostas de entrada
@@ -469,7 +505,7 @@ export function useDashboardData() {
       setStatsData(defaultStats);
       return defaultStats;
     }
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, filtroDataInicioEmpresa, filtroDataFimEmpresa, filtroSemDataInicio]);
   
   // Função otimizada para buscar propostas recentes diretamente do Supabase
   const fetchPropostasRecentes = useCallback(async () => {
@@ -488,6 +524,7 @@ export function useDashboardData() {
         .order('data', { ascending: false })
         .limit(5);
 
+      // Aplicar filtros de data padrão
       if (filtroDataInicio && filtroDataFim) {
         const startDateISO = filtroDataInicio.toISOString();
         const endDateISO = filtroDataFim.toISOString();
@@ -495,7 +532,30 @@ export function useDashboardData() {
         queryEntrada = queryEntrada.gte('data', startDateISO).lte('data', endDateISO);
         querySaida = querySaida.gte('data', startDateISO).lte('data', endDateISO);
       } else {
-        console.log('fetchPropostasRecentes: Nenhum filtro de data aplicado.');
+        console.log('fetchPropostasRecentes: Nenhum filtro de data padrão aplicado.');
+      }
+      
+      // Aplicar filtros de data de início da empresa
+      if (filtroDataInicioEmpresa) {
+        const dataInicioEmpresaAjustada = ajustarDataFusoBrasilia(filtroDataInicioEmpresa);
+        console.log(`fetchPropostasRecentes: Aplicando filtro de data início empresa: ${dataInicioEmpresaAjustada}`);
+        queryEntrada = queryEntrada.gte('data_inicio', dataInicioEmpresaAjustada);
+        // Também aplicar o filtro nas propostas de saída usando a coluna 'data'
+        querySaida = querySaida.gte('data', dataInicioEmpresaAjustada);
+      }
+      
+      if (filtroDataFimEmpresa) {
+        const dataFimEmpresaAjustada = ajustarDataFusoBrasilia(filtroDataFimEmpresa);
+        console.log(`fetchPropostasRecentes: Aplicando filtro de data fim empresa: ${dataFimEmpresaAjustada}`);
+        queryEntrada = queryEntrada.lte('data_inicio', dataFimEmpresaAjustada);
+        // Também aplicar o filtro nas propostas de saída usando a coluna 'data'
+        querySaida = querySaida.lte('data', dataFimEmpresaAjustada);
+      }
+      
+      // Filtro para propostas sem data de início
+      if (filtroSemDataInicio) {
+        console.log('fetchPropostasRecentes: Aplicando filtro para propostas sem data de início');
+        queryEntrada = queryEntrada.is('data_inicio', null);
       }
       
       // Buscar propostas de entrada mais recentes
@@ -556,7 +616,7 @@ export function useDashboardData() {
       setFilteredData(prev => ({ ...prev, propostasRecentes: [] }));
       return [];
     }
-  }, []);
+  }, [filtroDataInicio, filtroDataFim, filtroDataInicioEmpresa, filtroDataFimEmpresa, filtroSemDataInicio, ajustarDataFusoBrasilia]);
   
   // Função para buscar dados de tipo de tributação - corrigindo a query
   const fetchTipoTributacao = useCallback(async () => {
@@ -568,13 +628,33 @@ export function useDashboardData() {
         .select('tributacao')
         .not('tributacao', 'is', null);
 
+      // Aplicar filtros de data padrão
       if (filtroDataInicio && filtroDataFim) {
         const startDateISO = filtroDataInicio.toISOString();
         const endDateISO = filtroDataFim.toISOString();
         console.log(`fetchTipoTributacao: Aplicando filtro de data de ${startDateISO} a ${endDateISO}`);
         query = query.gte('data', startDateISO).lte('data', endDateISO);
       } else {
-        console.log('fetchTipoTributacao: Nenhum filtro de data aplicado.');
+        console.log('fetchTipoTributacao: Nenhum filtro de data padrão aplicado.');
+      }
+      
+      // Aplicar filtros de data de início da empresa
+      if (filtroDataInicioEmpresa) {
+        const dataInicioEmpresaAjustada = ajustarDataFusoBrasilia(filtroDataInicioEmpresa);
+        console.log(`fetchTipoTributacao: Aplicando filtro de data início empresa: ${dataInicioEmpresaAjustada}`);
+        query = query.gte('data_inicio', dataInicioEmpresaAjustada);
+      }
+      
+      if (filtroDataFimEmpresa) {
+        const dataFimEmpresaAjustada = ajustarDataFusoBrasilia(filtroDataFimEmpresa);
+        console.log(`fetchTipoTributacao: Aplicando filtro de data fim empresa: ${dataFimEmpresaAjustada}`);
+        query = query.lte('data_inicio', dataFimEmpresaAjustada);
+      }
+      
+      // Filtro para propostas sem data de início
+      if (filtroSemDataInicio) {
+        console.log('fetchTipoTributacao: Aplicando filtro para propostas sem data de início');
+        query = query.is('data_inicio', null);
       }
 
       const { data, error } = await query;
@@ -619,7 +699,7 @@ export function useDashboardData() {
       setFilteredData(prev => ({ ...prev, tributacao: DEFAULT_TRIBUTACAO_DATA }));
       return DEFAULT_TRIBUTACAO_DATA;
     }
-  }, []);
+  }, [filtroDataInicio, filtroDataFim, filtroDataInicioEmpresa, filtroDataFimEmpresa, filtroSemDataInicio, ajustarDataFusoBrasilia]);
   
   // Função para buscar dados de origem de clientes - corrigindo a query
   const fetchOrigemClientes = useCallback(async () => {
@@ -631,13 +711,33 @@ export function useDashboardData() {
         .select('origem')
         .not('origem', 'is', null);
 
+      // Aplicar filtros de data padrão
       if (filtroDataInicio && filtroDataFim) {
         const startDateISO = filtroDataInicio.toISOString();
         const endDateISO = filtroDataFim.toISOString();
         console.log(`fetchOrigemClientes: Aplicando filtro de data de ${startDateISO} a ${endDateISO}`);
         query = query.gte('data', startDateISO).lte('data', endDateISO);
       } else {
-        console.log('fetchOrigemClientes: Nenhum filtro de data aplicado.');
+        console.log('fetchOrigemClientes: Nenhum filtro de data padrão aplicado.');
+      }
+      
+      // Aplicar filtros de data de início da empresa
+      if (filtroDataInicioEmpresa) {
+        const dataInicioEmpresaAjustada = ajustarDataFusoBrasilia(filtroDataInicioEmpresa);
+        console.log(`fetchOrigemClientes: Aplicando filtro de data início empresa: ${dataInicioEmpresaAjustada}`);
+        query = query.gte('data_inicio', dataInicioEmpresaAjustada);
+      }
+      
+      if (filtroDataFimEmpresa) {
+        const dataFimEmpresaAjustada = ajustarDataFusoBrasilia(filtroDataFimEmpresa);
+        console.log(`fetchOrigemClientes: Aplicando filtro de data fim empresa: ${dataFimEmpresaAjustada}`);
+        query = query.lte('data_inicio', dataFimEmpresaAjustada);
+      }
+      
+      // Filtro para propostas sem data de início
+      if (filtroSemDataInicio) {
+        console.log('fetchOrigemClientes: Aplicando filtro para propostas sem data de início');
+        query = query.is('data_inicio', null);
       }
 
       const { data, error } = await query;
@@ -682,7 +782,7 @@ export function useDashboardData() {
       setFilteredData(prev => ({ ...prev, origemClientes: [] }));
       return [];
     }
-  }, []);
+  }, [filtroDataInicio, filtroDataFim, filtroDataInicioEmpresa, filtroDataFimEmpresa, filtroSemDataInicio, ajustarDataFusoBrasilia]);
   
   // Função para buscar histórico de fechamento - usando dados estáticos melhorados
   const fetchHistoricoFechamento = useCallback(async () => {
@@ -978,7 +1078,7 @@ export function useDashboardData() {
       // Marcar que a atualização foi concluída
       lastDashboardUpdate.current.inProgress = false;
     }
-  }, [fetchIndicadores, fetchPropostasRecentes, fetchTipoTributacao, fetchOrigemClientes, fetchHistoricoFechamento, fetchAnalytics, selectedMonth, selectedYear]);
+  }, [fetchIndicadores, fetchPropostasRecentes, fetchTipoTributacao, fetchOrigemClientes, fetchHistoricoFechamento, fetchAnalytics, selectedMonth, selectedYear, filtroDataInicioEmpresa, filtroDataFimEmpresa, filtroSemDataInicio]);
   
   // Removido o debounce que não é mais necessário
 
@@ -989,183 +1089,32 @@ export function useDashboardData() {
   
   // Função para aplicar filtros
   const aplicarFiltros = useCallback(() => {
-    // Evitar múltiplas chamadas em curto período de tempo
-    const now = Date.now();
-    if (now - lastFilterApply.current.timestamp < 500) {
-      console.log('Ignorando chamada de aplicarFiltros (muito frequente)');
-      return;
-    }
+    console.log('Aplicando filtros no Dashboard...');
+    console.log(`Filtros atuais: Mês=${selectedMonth}, Ano=${selectedYear}`);
+    console.log(`Filtros de data empresa: ${filtroDataInicioEmpresa} até ${filtroDataFimEmpresa}, Sem data: ${filtroSemDataInicio}`);
     
-    // Atualizar timestamp da última aplicação
-    lastFilterApply.current.timestamp = now;
-    
-    console.log('Aplicando filtros:', { selectedMonth, selectedYear });
-    setFilterDialogOpen(false);
-    
-    // Atualizar a referência de última atualização para evitar duplicação no useEffect
-    lastUpdate.current = {
-      month: selectedMonth,
-      year: selectedYear,
-      timestamp: now
-    };
-    
-    // Forçar atualização imediata com os valores atuais dos filtros
-    console.log('Executando updateDashboardData com filtros:', { selectedMonth, selectedYear });
-    
-    // Persistir os filtros no localStorage
-    if (selectedMonth !== 0 && selectedYear !== 0) {
-      localStorage.setItem('dashboard-filters', JSON.stringify({ 
-        selectedMonth, 
-        selectedYear 
-      }));
-    }
-    
-    // Pequeno delay para garantir que os estados foram atualizados
-    setTimeout(() => {
-      updateDashboardData();
-    }, 50);
-  }, [updateDashboardData, selectedMonth, selectedYear]);
+    // Atualizar dados com os filtros aplicados
+    updateDashboardData();
+  }, [selectedMonth, selectedYear, filtroDataInicioEmpresa, filtroDataFimEmpresa, filtroSemDataInicio, updateDashboardData]);
 
   // Função para limpar filtros
   const limparFiltros = useCallback(() => {
-    console.log('Limpando filtros');
+    console.log('Limpando todos os filtros...');
     
-    // Usar 0 como valor especial para indicar "sem filtro"
+    // Limpar filtros de mês e ano
     setSelectedMonth(0);
     setSelectedYear(0);
     
-    // Remover filtros do localStorage
-    localStorage.removeItem('dashboard-filters');
+    // Limpar filtros de data de início da empresa
+    setFiltroDataInicioEmpresa("");
+    setFiltroDataFimEmpresa("");
+    setFiltroSemDataInicio(false);
     
-    // Atualizar a referência de última atualização para evitar duplicação no useEffect
-    lastUpdate.current = {
-      month: 0,
-      year: 0,
-      timestamp: Date.now()
-    };
-    
-    // Pequeno delay antes de atualizar os dados para garantir que os estados foram atualizados
-    setTimeout(() => {
-      // Atualizar os dados sem filtros
-      console.log('Atualizando dados após limpar filtros');
-      updateDashboardData();
-      toast.success("Filtros removidos com sucesso!");
-    }, 100);
-  }, [updateDashboardData]);
-  
-  // Configurar período selecionado
-  useEffect(() => {
-    const now = new Date();
-    let startDate;
-    let endDate = now; // Por padrão, o fim é a data atual
+    // Atualizar dados sem filtros
+    updateDashboardData();
+  }, [updateDashboardData, setSelectedMonth, setSelectedYear, setFiltroDataInicioEmpresa, setFiltroDataFimEmpresa, setFiltroSemDataInicio]);
 
-    if (selectedPeriod === 'week') {
-      startDate = new Date(now);
-      startDate.setDate(now.getDate() - 7);
-    } else if (selectedPeriod === 'month') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1); // Início do mês atual
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Fim do mês atual
-    } else if (selectedPeriod === 'year') {
-      startDate = new Date(now.getFullYear(), 0, 1); // Início do ano atual
-      endDate = new Date(now.getFullYear(), 11, 31); // Fim do ano atual
-    } else {
-      // Caso padrão ou 'custom' se o usuário definir manualmente
-      // Não fazemos nada aqui, pois as datas já seriam definidas pelos inputs
-      return; 
-    }
-    
-    setFiltroDataInicio(startDate);
-    setFiltroDataFim(endDate);
-    
-    // Chamar updateDashboardData apenas se o período selecionado for alterado
-    // e não for a carga inicial, para evitar loop.
-    // A carga inicial será tratada por outro useEffect.
-    if (initialLoadComplete.current) {
-      updateDashboardData();
-    }
-
-  }, [selectedPeriod, updateDashboardData]);
-  
-  // Modificar o useEffect para usar a versão com debounce
-  useEffect(() => {
-    // Inicializar os dados apenas uma vez durante a primeira renderização
-    if (!initialLoadComplete.current) {
-      initialLoadComplete.current = true;
-      updateDashboardData();
-    }
-    
-    // Esta função é executada quando o componente é desmontado
-    return () => {
-      console.log('Limpando recursos do dashboard');
-    };
-  }, [updateDashboardData]);
-
-  // Referência para controlar a última atualização
-  const lastUpdate = useRef({
-    month: 0,
-    year: 0,
-    timestamp: 0
-  });
-
-  // Modificar o useEffect para monitorar mudanças nos filtros
-  useEffect(() => {
-    // Não executar na montagem inicial
-    if (initialLoadComplete.current) {
-      console.log('Filtros alterados:', { selectedMonth, selectedYear });
-      
-      // Verificar se já atualizamos com esses mesmos filtros recentemente
-      const now = Date.now();
-      const lastUpdateTime = lastUpdate.current.timestamp;
-      const sameFilters = lastUpdate.current.month === selectedMonth && 
-                          lastUpdate.current.year === selectedYear;
-      
-      // Só atualizar se os filtros mudaram ou se passou tempo suficiente desde a última atualização
-      if (!sameFilters || (now - lastUpdateTime > 2000)) {
-        console.log('Executando updateDashboardData após mudança de filtros:', { selectedMonth, selectedYear });
-        
-        // Atualizar referência da última atualização
-        lastUpdate.current = {
-          month: selectedMonth,
-          year: selectedYear,
-          timestamp: now
-        };
-        
-        updateDashboardData();
-      } else {
-        console.log('Ignorando atualização repetida com os mesmos filtros');
-      }
-    }
-  }, [selectedMonth, selectedYear, updateDashboardData]);
-
-  // Adicionar um efeito para persistir os filtros no localStorage
-  useEffect(() => {
-    // Não salvar na montagem inicial
-    if (initialLoadComplete.current && (selectedMonth !== 0 || selectedYear !== 0)) {
-      console.log('Salvando filtros no localStorage:', { selectedMonth, selectedYear });
-      localStorage.setItem('dashboard-filters', JSON.stringify({ 
-        selectedMonth, 
-        selectedYear 
-      }));
-    }
-  }, [selectedMonth, selectedYear]);
-
-  // Adicionar um efeito para carregar os filtros do localStorage
-  useEffect(() => {
-    try {
-      const savedFilters = localStorage.getItem('dashboard-filters');
-      if (savedFilters) {
-        const { selectedMonth: month, selectedYear: year } = JSON.parse(savedFilters);
-        console.log('Carregando filtros do localStorage:', { month, year });
-        
-        // Só aplicar se os valores forem diferentes dos atuais
-        if (month !== selectedMonth) setSelectedMonth(month);
-        if (year !== selectedYear) setSelectedYear(year);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar filtros do localStorage:', error);
-    }
-  }, []);
-
+  // Retornar estados e funções
   return {
     statsData,
     filteredData,
@@ -1174,6 +1123,9 @@ export function useDashboardData() {
     filterDialogOpen,
     filtroDataInicio,
     filtroDataFim,
+    filtroDataInicioEmpresa,
+    filtroDataFimEmpresa,
+    filtroSemDataInicio,
     selectedPeriod,
     selectedMonth,
     selectedYear,
@@ -1182,6 +1134,9 @@ export function useDashboardData() {
     setFilterDialogOpen,
     setFiltroDataInicio,
     setFiltroDataFim,
+    setFiltroDataInicioEmpresa,
+    setFiltroDataFimEmpresa,
+    setFiltroSemDataInicio,
     setSelectedPeriod,
     aplicarFiltros,
     limparFiltros,

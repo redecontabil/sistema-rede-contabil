@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Eraser } from "lucide-react";
+import { Eraser, Filter } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,6 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 interface DashboardHeaderProps {
   greeting: string;
@@ -23,6 +27,12 @@ interface DashboardHeaderProps {
   setFiltroDataInicio: (date: Date | undefined) => void;
   filtroDataFim?: Date;
   setFiltroDataFim: (date: Date | undefined) => void;
+  filtroDataInicioEmpresa: string;
+  setFiltroDataInicioEmpresa: (date: string) => void;
+  filtroDataFimEmpresa: string;
+  setFiltroDataFimEmpresa: (date: string) => void;
+  filtroSemDataInicio: boolean;
+  setFiltroSemDataInicio: (checked: boolean) => void;
   aplicarFiltros: () => void;
   limparFiltros: () => void;
   userName?: string;
@@ -60,6 +70,12 @@ const DashboardHeader = ({
   setFiltroDataInicio,
   filtroDataFim,
   setFiltroDataFim,
+  filtroDataInicioEmpresa,
+  setFiltroDataInicioEmpresa,
+  filtroDataFimEmpresa,
+  setFiltroDataFimEmpresa,
+  filtroSemDataInicio,
+  setFiltroSemDataInicio,
   aplicarFiltros,
   limparFiltros,
   userName = "Contador",
@@ -76,7 +92,10 @@ const DashboardHeader = ({
   };
 
   // Determinar se os filtros estão ativos
-  const filtrosAtivos = selectedMonth !== 0 && selectedYear !== 0;
+  const filtrosAtivos = selectedMonth !== 0 && selectedYear !== 0 || 
+                       filtroDataInicioEmpresa !== "" || 
+                       filtroDataFimEmpresa !== "" || 
+                       filtroSemDataInicio;
 
   return (
     <>
@@ -101,6 +120,156 @@ const DashboardHeader = ({
         
         {/* Filtros temporais */}
         <div className="flex items-center gap-4">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="gap-2 hover:bg-primary hover:text-white transition-colors">
+                <Filter className="h-4 w-4" />
+                Filtrar
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[600px] max-w-[600px] p-6 shadow-lg" align="start" side="bottom">
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filtros
+                  </h4>
+                  <Tabs defaultValue="periodo" className="w-full">
+                    <TabsList className="w-full mb-4 grid grid-cols-2">
+                      <TabsTrigger value="periodo">Período</TabsTrigger>
+                      <TabsTrigger value="dataEmpresa">Data Empresa</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="periodo" className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="mes" className="text-sm font-medium">
+                            Mês
+                          </Label>
+                          <Select
+                            value={selectedMonth !== 0 ? selectedMonth.toString() : ""}
+                            onValueChange={(value) => {
+                              const monthValue = parseInt(value);
+                              if (selectedYear === 0) {
+                                const currentYear = new Date().getFullYear();
+                                setSelectedMonth(monthValue);
+                                setSelectedYear(currentYear);
+                              } else {
+                                setSelectedMonth(monthValue);
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o mês" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {MONTHS.map((month) => (
+                                  <SelectItem key={month.value} value={month.value.toString()}>
+                                    {month.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="ano" className="text-sm font-medium">
+                            Ano
+                          </Label>
+                          <Select
+                            value={selectedYear !== 0 ? selectedYear.toString() : ""}
+                            onValueChange={(value) => {
+                              const yearValue = parseInt(value);
+                              if (selectedMonth === 0) {
+                                const currentMonth = new Date().getMonth() + 1;
+                                setSelectedYear(yearValue);
+                                setSelectedMonth(currentMonth);
+                              } else {
+                                setSelectedYear(yearValue);
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o ano" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {YEARS.map((year) => (
+                                  <SelectItem key={year} value={year.toString()}>
+                                    {year}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="dataEmpresa" className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="dataInicioEmpresa" className="text-sm font-medium">
+                            Data Início Empresa
+                          </Label>
+                          <Input
+                            type="date"
+                            id="dataInicioEmpresa"
+                            value={filtroDataInicioEmpresa}
+                            onChange={(e) => setFiltroDataInicioEmpresa(e.target.value)}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="dataFimEmpresa" className="text-sm font-medium">
+                            Data Fim Empresa
+                          </Label>
+                          <Input
+                            type="date"
+                            id="dataFimEmpresa"
+                            value={filtroDataFimEmpresa}
+                            onChange={(e) => setFiltroDataFimEmpresa(e.target.value)}
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div className="col-span-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="semDataInicio"
+                              checked={filtroSemDataInicio}
+                              onCheckedChange={(checked) => setFiltroSemDataInicio(checked as boolean)}
+                            />
+                            <Label htmlFor="semDataInicio" className="text-sm font-medium">
+                              Sem data de início
+                            </Label>
+                          </div>
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    onClick={limparFiltros}
+                    className="hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                  >
+                    Limpar
+                  </Button>
+                  <Button 
+                    onClick={aplicarFiltros}
+                    className="hover:bg-primary/90 transition-colors"
+                  >
+                    Aplicar Filtros
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <Select
             value={selectedMonth !== 0 ? selectedMonth.toString() : ""}
             onValueChange={(value) => {

@@ -42,6 +42,9 @@ export default function Dashboard() {
     filterDialogOpen,
     filtroDataInicio,
     filtroDataFim,
+    filtroDataInicioEmpresa,
+    filtroDataFimEmpresa,
+    filtroSemDataInicio,
     selectedPeriod,
     selectedMonth,
     selectedYear,
@@ -50,6 +53,9 @@ export default function Dashboard() {
     setFilterDialogOpen,
     setFiltroDataInicio,
     setFiltroDataFim,
+    setFiltroDataInicioEmpresa,
+    setFiltroDataFimEmpresa,
+    setFiltroSemDataInicio,
     setSelectedPeriod,
     aplicarFiltros,
     limparFiltros,
@@ -190,7 +196,13 @@ export default function Dashboard() {
         filtroDataInicio={filtroDataInicio} 
         setFiltroDataInicio={setFiltroDataInicio} 
         filtroDataFim={filtroDataFim} 
-        setFiltroDataFim={setFiltroDataFim} 
+        setFiltroDataFim={setFiltroDataFim}
+        filtroDataInicioEmpresa={filtroDataInicioEmpresa}
+        setFiltroDataInicioEmpresa={setFiltroDataInicioEmpresa}
+        filtroDataFimEmpresa={filtroDataFimEmpresa}
+        setFiltroDataFimEmpresa={setFiltroDataFimEmpresa}
+        filtroSemDataInicio={filtroSemDataInicio}
+        setFiltroSemDataInicio={setFiltroSemDataInicio}
         aplicarFiltros={aplicarFiltros} 
         limparFiltros={limparFiltros} 
         userName={userName}
