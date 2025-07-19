@@ -12,15 +12,8 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabaseClient";
 
 // Interface para os dados de bonificação mensal
@@ -161,6 +154,28 @@ export default function Bonificacao() {
   
   // Estado para indicar quando está calculando os valores
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
+  
+  // Função para validar e atualizar o ano
+  const handleAnoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const valor = e.target.value;
+    
+    // Se o campo estiver vazio, não fazemos nada
+    if (!valor) {
+      e.target.value = anoAtual.toString();
+      return;
+    }
+    
+    const novoAno = parseInt(valor);
+    
+    // Validar se é um ano válido (entre 2023 e 2030)
+    if (novoAno >= 2023 && novoAno <= 2030) {
+      setAnoAtual(novoAno);
+    } else {
+      // Se for inválido, manter o valor anterior
+      e.target.value = anoAtual.toString();
+      toast.error("Por favor, insira um ano entre 2023 e 2030");
+    }
+  };
   
   // Obter os dados do ano atual
   const bonificacaoData = useMemo(() => {
@@ -343,19 +358,26 @@ export default function Bonificacao() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select
-            value={anoAtual.toString()}
-            onValueChange={(value) => setAnoAtual(parseInt(value))}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Selecione o ano" />
-            </SelectTrigger>
-            <SelectContent>
-              {ANOS_DISPONIVEIS.map(ano => (
-                <SelectItem key={ano} value={ano.toString()}>{ano}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label htmlFor="ano" className="text-sm font-medium whitespace-nowrap">
+            Filtrar por ano:
+          </Label>
+          <Input
+            id="ano"
+            type="number"
+            value={anoAtual}
+            onChange={handleAnoChange}
+            onBlur={(e) => {
+              // Garantir que ao sair do campo, o valor seja válido
+              if (!e.target.value || parseInt(e.target.value) < 2023 || parseInt(e.target.value) > 2030) {
+                e.target.value = anoAtual.toString();
+                toast.error("Por favor, insira um ano entre 2023 e 2030");
+              }
+            }}
+            min="2023"
+            max="2030"
+            className="w-[100px] text-center font-medium border-primary/20 focus:border-primary"
+            placeholder="Ano"
+          />
         </div>
       </div>
       
