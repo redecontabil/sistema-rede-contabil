@@ -633,27 +633,69 @@ export default function Proposta() {
     return `${year}-${newNumber}`;
   };
 
-  // Handlers para os formulários
-  const onSubmitNewProposal = async (values: PropostaFormData) => {
-    try {
-      // Verificar se é uma edição ou uma nova proposta
-      if (selectedProposta) {
-        const { data, error } = await supabase
-          .from('propostas')
-          .update({
-            ...values,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', selectedProposta.id);
+  // Função para tratar data_inicio vazia
+const formatDataInicioForDatabase = (dataInicio) => {
+  if (!dataInicio || dataInicio === "" || dataInicio === null || dataInicio === undefined) {
+    return null;
+  }
+  return dataInicio;
+};
 
-        if (error) throw error;
-        
-        // Registrar evento de edição
+// Handlers para os formulários
+const onSubmitNewProposal = async (values: PropostaFormData) => {
+  try {
+    // Processar values para tratar data_inicio
+    const processedValues = {
+      ...values,
+      data_inicio: formatDataInicioForDatabase(values.data_inicio)
+    };
+
+    // Verificar se é uma edição ou uma nova proposta
+    if (selectedProposta) {
+      const { data, error } = await supabase
+        .from('propostas')
+        .update({
+          ...processedValues,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedProposta.id);
+      if (error) throw error;
+      
+      // Registrar evento de edição
+      await registrarEvento(
+        "edicao",
+        "proposta",
+        selectedProposta.id.toString(),
+        `Proposta de entrada editada: ${values.cliente}`,
+        { 
+          cliente: values.cliente,
+          honorario: values.honorario,
+          status: values.status,
+          responsavel: values.responsavel
+        }
+      );
+      toast({
+        title: "Proposta atualizada com sucesso!",
+      });
+    } else {
+      // Criar uma nova proposta
+      const { data, error } = await supabase
+        .from('propostas')
+        .insert([{
+          ...processedValues,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select();
+      if (error) throw error;
+      
+      // Registrar evento de criação
+      if (data && data[0]) {
         await registrarEvento(
-          "edicao",
+          "criacao",
           "proposta",
-          selectedProposta.id.toString(),
-          `Proposta de entrada editada: ${values.cliente}`,
+          data[0].id.toString(),
+          `Nova proposta de entrada criada: ${values.cliente}`,
           { 
             cliente: values.cliente,
             honorario: values.honorario,
@@ -661,59 +703,26 @@ export default function Proposta() {
             responsavel: values.responsavel
           }
         );
-
-        toast({
-          title: "Proposta atualizada com sucesso!",
-        });
-      } else {
-        // Criar uma nova proposta
-        const { data, error } = await supabase
-          .from('propostas')
-          .insert([{
-            ...values,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }])
-          .select();
-
-        if (error) throw error;
-        
-        // Registrar evento de criação
-        if (data && data[0]) {
-          await registrarEvento(
-            "criacao",
-            "proposta",
-            data[0].id.toString(),
-            `Nova proposta de entrada criada: ${values.cliente}`,
-            { 
-              cliente: values.cliente,
-              honorario: values.honorario,
-              status: values.status,
-              responsavel: values.responsavel
-            }
-          );
-        }
-
-        toast({
-          title: "Proposta criada com sucesso!",
-        });
       }
-
-      // Fechar o diálogo e recarregar as propostas
-      setOpenNewProposal(false);
-      setSelectedProposta(null);
-      fetchPropostas();
-      form.reset();
-    } catch (error: any) {
-      console.error('Erro ao salvar proposta:', error);
       toast({
-        title: "Erro ao salvar proposta",
-        description: error.message,
-        variant: "destructive",
+        title: "Proposta criada com sucesso!",
       });
     }
-  };
-
+    // Fechar o diálogo e recarregar as propostas
+    setOpenNewProposal(false);
+    setSelectedProposta(null);
+    fetchPropostas();
+    form.reset();
+  } catch (error: any) {
+    console.error('Erro ao salvar proposta:', error);
+    toast({
+      title: "Erro ao salvar proposta",
+      description: error.message,
+      variant: "destructive",
+    });
+  }
+};
+  
   const onSubmitExitProposal = async (values: PropostaSaidaFormData) => {
     try {
       // Verificar se é uma edição ou uma nova proposta de saída
