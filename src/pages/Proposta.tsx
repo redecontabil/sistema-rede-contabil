@@ -633,21 +633,22 @@ export default function Proposta() {
     return `${year}-${newNumber}`;
   };
 
-  // Função para tratar data_inicio vazia
-const formatDataInicioForDatabase = (dataInicio) => {
-  if (!dataInicio || dataInicio === "" || dataInicio === null || dataInicio === undefined) {
+  // Função para tratar campos de data vazios
+const formatDateForDatabase = (dateValue) => {
+  if (!dateValue || dateValue === "" || dateValue === null || dateValue === undefined) {
     return null;
   }
-  return dataInicio;
+  return dateValue;
 };
 
 // Handlers para os formulários
 const onSubmitNewProposal = async (values: PropostaFormData) => {
   try {
-    // Processar values para tratar data_inicio
+    // Processar values para tratar campos de data opcionais
     const processedValues = {
       ...values,
-      data_inicio: formatDataInicioForDatabase(values.data_inicio)
+      data_fechamento: formatDateForDatabase(values.data_fechamento),
+      data_inicio: formatDateForDatabase(values.data_inicio)
     };
 
     // Verificar se é uma edição ou uma nova proposta
