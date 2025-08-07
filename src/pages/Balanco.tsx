@@ -407,6 +407,9 @@ export default function Balanco() {
           }
         }
         
+        // Sincronizar com Supabase para outros usuários
+        syncToSupabase(updatedData);
+        
         return updatedData;
       });
       
@@ -422,11 +425,16 @@ export default function Balanco() {
   const saveDescription = () => {
     if (editingDescription) {
       setFinancialData(prev => {
-        return prev.map(item => 
+        const updatedData = prev.map(item => 
           item.id === editingDescription.id 
             ? { ...item, description: editingDescription.description } 
             : item
         );
+        
+        // Sincronizar com Supabase para outros usuários
+        syncToSupabase(updatedData);
+        
+        return updatedData;
       });
       setEditingDescription(null);
       toast({
@@ -633,6 +641,111 @@ export default function Balanco() {
 
   // Estado para rastrear itens editados manualmente (não devem ser sobrescritos)
   const [manuallyEditedItems, setManuallyEditedItems] = useState<Set<string>>(loadManualEditsFromStorage);
+
+  // Estado para controlar se deve sincronizar com outros usuários
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Função para salvar dados no Supabase para sincronização
+  const syncToSupabase = async (data: FinancialItem[]) => {
+    if (isSyncing) return; // Evitar loop infinito
+    
+    try {
+      setIsSyncing(true);
+      
+      // Deletar todos os registros existentes e inserir novos (replace)
+      await supabase.from('balanco_dados').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      // Preparar dados para inserção
+      const dataToInsert = data
+        .filter(item => item.type !== 'spacer') // Não salvar spacers
+        .map(item => ({
+          item_id: item.id,
+          description: item.description || '',
+          value: item.value,
+          type: item.type,
+          category: item.category || null,
+          editable: item.editable,
+          bold: item.bold || false
+        }));
+
+      if (dataToInsert.length > 0) {
+        const { error } = await supabase
+          .from('balanco_dados')
+          .insert(dataToInsert);
+        
+        if (error) {
+          console.error('Erro ao sincronizar com Supabase:', error);
+        } else {
+          console.log('✅ Dados sincronizados com Supabase com sucesso');
+        }
+      }
+    } catch (error) {
+      console.error('Erro na sincronização:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Função para carregar dados do Supabase
+  const loadFromSupabase = async (): Promise<FinancialItem[] | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('balanco_dados')
+        .select('*')
+        .order('item_id');
+
+      if (error) {
+        console.error('Erro ao carregar dados do Supabase:', error);
+        return null;
+      }
+
+      if (data && data.length > 0) {
+        // Converter dados do Supabase para formato FinancialItem
+        const convertedData: FinancialItem[] = data.map(item => ({
+          id: item.item_id,
+          type: item.type as 'header' | 'item' | 'footer' | 'spacer',
+          description: item.description,
+          value: Number(item.value),
+          editable: item.editable,
+          bold: item.bold,
+          category: item.category as CategoryType
+        }));
+
+        // Adicionar spacers de volta nos locais corretos
+        const dataWithSpacers = [...convertedData];
+        
+        // Inserir spacers nas posições corretas (baseado nos dados iniciais)
+        const spacerPositions = [
+          { after: 2, id: 4 }, // Após EXTRAS
+          { after: 14, id: 15 }, // Após itens de ENCERRAMENTO  
+          { after: 22, id: 23 } // Após itens de RESERVA
+        ];
+
+        spacerPositions.forEach(pos => {
+          dataWithSpacers.splice(pos.after, 0, {
+            id: pos.id,
+            type: 'spacer',
+            value: 0,
+            editable: false
+          });
+        });
+
+        // Re-indexar IDs para manter sequência
+        const reindexed = dataWithSpacers.map((item, index) => ({
+          ...item,
+          id: index + 1
+        }));
+
+        console.log('✅ Dados carregados do Supabase');
+        return reindexed;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Erro ao carregar dados do Supabase:', error);
+      return null;
+    }
+  };
 
   // Função para buscar o total de todos os centros de custo
   const fetchTotalCentrosCusto = async () => {
@@ -888,6 +1001,58 @@ export default function Balanco() {
       supabase.removeChannel(channelSaida);
     };
   }, []);
+
+  // Configurar realtime subscription para sincronização entre usuários
+  useEffect(() => {
+    // Primeiro, tentar carregar dados do Supabase na inicialização
+    const initializeFromSupabase = async () => {
+      const supabaseData = await loadFromSupabase();
+      if (supabaseData && supabaseData.length > 0) {
+        console.log('📥 Carregando dados iniciais do Supabase');
+        setFinancialData(supabaseData);
+      } else {
+        console.log('📤 Inicializando Supabase com dados locais');
+        // Se não há dados no Supabase, sincronizar dados locais
+        syncToSupabase(financialData);
+      }
+    };
+
+    initializeFromSupabase();
+
+    // Configurar subscription para mudanças em tempo real
+    const channel = supabase
+      .channel('balanco_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'balanco_dados'
+        },
+        async (payload) => {
+          console.log('🔄 Detectada mudança no balanço de outro usuário:', payload);
+          
+          // Recarregar dados do Supabase quando houver mudanças
+          const updatedData = await loadFromSupabase();
+          if (updatedData && !isSyncing) {
+            console.log('📥 Atualizando dados locais com mudanças de outros usuários');
+            setFinancialData(updatedData);
+            
+            // Mostrar notificação para o usuário
+            toast({
+              title: "Dados atualizados",
+              description: "O balanço foi atualizado por outro usuário.",
+              duration: 3000
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isSyncing]); // Dependência do isSyncing para evitar loops
 
   return (
     <div className="space-y-6">
