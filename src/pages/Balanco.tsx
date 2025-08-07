@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  Scale, TrendingUp, TrendingDown, Edit2, Check, X, DollarSign, Wallet, Plus, Trash2, ArrowUpRight, Briefcase, Building, BarChart3
+  Scale, TrendingUp, TrendingDown, Edit2, Check, X, DollarSign, Wallet, Plus, Trash2, ArrowUpRight, Briefcase, Building, CircleDollarSign, BarChart3
 } from "lucide-react";
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
@@ -76,7 +76,7 @@ const financialDataInitial: FinancialItem[] = [
   { id: 2, type: 'item', description: 'EXTRAS', value: 14000.00, editable: true, category: 'RECEITA' },
   { id: 3, type: 'item', description: 'PERDAS', value: -1300.00, editable: true, category: 'ENCERRAMENTO' },
   { id: 4, type: 'spacer', value: 0, editable: false },
-  { id: 5, type: 'item', description: 'ENCERRAMENTO', value: -2036.00, editable: true, category: 'ENCERRAMENTO' },
+  { id: 5, type: 'header', description: 'ENCERRAMENTO', value: -2036.00, editable: true, bold: true, category: 'ENCERRAMENTO' },
   { id: 6, type: 'item', description: 'Funcionários', value: -1000.00, editable: true, category: 'ENCERRAMENTO' },
   { id: 7, type: 'item', description: 'Pró-labore', value: -1300.00, editable: true, category: 'ENCERRAMENTO' },
   { id: 8, type: 'item', description: 'Marketing', value: -300.00, editable: true, category: 'ENCERRAMENTO' },
@@ -98,10 +98,9 @@ const financialDataInitial: FinancialItem[] = [
   { id: 24, type: 'footer', description: 'LUCRO', value: 14331.25, percentage: '9.42%', editable: false, bold: true, bgColor: 'bg-[#435e19]', textColor: 'text-white' },
 ];
 
-// Chaves para o localStorage
+// Chave para o localStorage
 const STORAGE_KEY = 'balanco-financial-data';
 const HISTORICO_STORAGE_KEY = 'balanco-historico-data';
-const MANUAL_EDITS_KEY = 'balanco-manual-edits';
 
 export default function Balanco() {
 
@@ -251,18 +250,14 @@ export default function Balanco() {
 
   // Calcular totais para as métricas principais (usando valores reais, não Math.abs)
   const calcularDespesasTotal = () => {
-    // Incluir tanto itens quanto headers da categoria ENCERRAMENTO
-    const itensEncerramento = financialData.filter(item => 
-      item.category === 'ENCERRAMENTO' && (item.type === 'item' || item.type === 'header')
-    );
-    const total = itensEncerramento.reduce((acc, cur) => acc + cur.value, 0);
-    return total;
+    return financialData
+      .filter(item => item.category === 'ENCERRAMENTO' && item.type === 'item')
+      .reduce((acc, cur) => acc + cur.value, 0);
   };
 
   const calcularReservasTotal = () => {
-    // Incluir tanto itens quanto headers da categoria RESERVA
     return financialData
-      .filter(item => item.category === 'RESERVA' && (item.type === 'item' || item.type === 'header'))
+      .filter(item => item.category === 'RESERVA' && item.type === 'item')
       .reduce((acc, cur) => acc + cur.value, 0);
   };
 
@@ -354,20 +349,6 @@ export default function Balanco() {
     if (editingCell) {
       setFinancialData(prev => {
         const newData = [...prev];
-        
-        // Encontrar o item sendo editado para marcar como editado manualmente
-        const editedItem = newData.find(item => item.id === editingCell.id);
-        if (editedItem && editedItem.description) {
-          // Marcar este item como editado manualmente
-          setManuallyEditedItems(prevSet => {
-            const newSet = new Set(prevSet);
-            newSet.add(editedItem.description!);
-            console.log(`Marcando "${editedItem.description}" como editado manualmente`);
-            // Salvar no localStorage
-            saveManualEditsToStorage(newSet);
-            return newSet;
-          });
-        }
         
         // Atualizar o item que está sendo editado
         const updatedData = newData.map(item =>
@@ -597,34 +578,6 @@ export default function Balanco() {
     return Math.abs(calcularReservasTotal());
   }, [financialData]);
 
-  // Função para carregar itens editados manualmente do localStorage
-  const loadManualEditsFromStorage = (): Set<string> => {
-    try {
-      const stored = localStorage.getItem(MANUAL_EDITS_KEY);
-      if (stored) {
-        const array = JSON.parse(stored);
-        return new Set(array);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar edições manuais do localStorage:', error);
-    }
-    return new Set();
-  };
-
-  // Função para salvar itens editados manualmente no localStorage
-  const saveManualEditsToStorage = (editedItems: Set<string>) => {
-    try {
-      const array = Array.from(editedItems);
-      localStorage.setItem(MANUAL_EDITS_KEY, JSON.stringify(array));
-      console.log('Edições manuais salvas no localStorage:', array);
-    } catch (error) {
-      console.error('Erro ao salvar edições manuais no localStorage:', error);
-    }
-  };
-
-  // Estado para rastrear itens editados manualmente (não devem ser sobrescritos)
-  const [manuallyEditedItems, setManuallyEditedItems] = useState<Set<string>>(loadManualEditsFromStorage);
-
   // Função para buscar o total de todos os centros de custo
   const fetchTotalCentrosCusto = async () => {
     try {
@@ -666,21 +619,14 @@ export default function Balanco() {
 
       console.log('Totais calculados:', totais);
       console.log('Valor OUTROS:', totalOutros);
-      console.log('Itens editados manualmente:', manuallyEditedItems);
 
       // Atualiza os valores na tabela de balanço (como valores negativos)
       setFinancialData(prev => {
         const updated = prev.map(item => {
-          // SEMPRE atualizar o campo OUTROS (não é editável manualmente)
+          // Atualizamos o campo OUTROS de forma explícita e prioritária
           if (item.description === 'OUTROS') {
             console.log('Atualizando campo OUTROS com valor:', -totalOutros);
             return { ...item, value: -totalOutros };
-          }
-          
-          // VERIFICAR se o item foi editado manualmente - se sim, NÃO sobrescrever
-          if (manuallyEditedItems.has(item.description || '')) {
-            console.log(`Preservando valor manual de "${item.description}": ${item.value}`);
-            return item; // Manter valor atual sem alterar
           }
           
           // Mapeamento entre as descrições na tabela de balanço e os centros de custo
@@ -697,7 +643,6 @@ export default function Balanco() {
 
           const centroCusto = descriptionToCentroCusto[item.description];
           if (centroCusto && totais[centroCusto] !== undefined) {
-            console.log(`Atualizando "${item.description}" com valor do Supabase: -${totais[centroCusto]}`);
             return { ...item, value: -totais[centroCusto] };
           }
           return item;
@@ -708,6 +653,23 @@ export default function Balanco() {
         
         return updated;
       });
+
+      // Garantir que o campo "OUTROS" seja atualizado especificamente
+      const outrosItem = financialData.find(item => item.description === 'OUTROS');
+      if (outrosItem) {
+        setFinancialData(prev => {
+          const updated = prev.map(item => 
+            item.description === 'OUTROS' 
+              ? { ...item, value: -totalOutros } 
+              : item
+          );
+          
+          // Salvar os dados atualizados no localStorage imediatamente
+          saveToStorage(updated);
+          
+          return updated;
+        });
+      }
 
     } catch (error) {
       console.error('Erro ao buscar totais:', error);
