@@ -218,14 +218,14 @@ export default function Balanco() {
     saveToStorage(financialData);
   }, [financialData]);
   
-  // Garantir que todos os valores abaixo de EXTRAS sejam negativos (dados iniciais apenas)
+  // Garantir que todos os valores de despesas e reservas sejam negativos (dados iniciais apenas)
   useEffect(() => {
     setFinancialData(prev => {
       return prev.map(item => {
-        // Se for um item abaixo de EXTRAS (exceto spacers e o próprio LUCRO)
-        // Agora incluindo PERDAS como um item que deve ser negativo
-        if ((item.id > 2 && item.id !== 4 && item.id !== 15 && item.id !== 23 && item.id !== 24 && item.type !== 'spacer') || 
-            item.description === 'PERDAS') {
+        // Se for um item de despesa (ENCERRAMENTO) ou reserva (RESERVA), garantir que seja negativo
+        if ((item.category === 'ENCERRAMENTO' || item.category === 'RESERVA') && 
+            item.type !== 'spacer' && 
+            !['RECEITA', 'EXTRAS'].includes(item.description || '')) {
           // Garantir que o valor seja negativo apenas na inicialização
           const value = item.value > 0 ? -Math.abs(item.value) : -Math.abs(item.value);
           return { ...item, value };
@@ -371,11 +371,11 @@ export default function Balanco() {
         const itemBeingEdited = newData.find(item => item.id === editingCell.id);
         let valueToSave = editingCell.value;
         
-        // Se for um item de despesa (categoria ENCERRAMENTO, exceto RECEITA/EXTRAS), garantir que seja negativo
+        // Se for um item de despesa (ENCERRAMENTO) ou reserva (RESERVA), garantir que seja negativo
         if (itemBeingEdited && 
-            itemBeingEdited.category === 'ENCERRAMENTO' && 
+            (itemBeingEdited.category === 'ENCERRAMENTO' || itemBeingEdited.category === 'RESERVA') && 
             !['RECEITA', 'EXTRAS'].includes(itemBeingEdited.description || '')) {
-          valueToSave = -Math.abs(editingCell.value); // Sempre negativo para despesas
+          valueToSave = -Math.abs(editingCell.value); // Sempre negativo para despesas e reservas
         }
         
         // Atualizar o item que está sendo editado
