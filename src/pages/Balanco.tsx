@@ -218,7 +218,7 @@ export default function Balanco() {
     saveToStorage(financialData);
   }, [financialData]);
   
-  // Garantir que todos os valores abaixo de EXTRAS sejam negativos
+  // Garantir que todos os valores abaixo de EXTRAS sejam negativos (dados iniciais apenas)
   useEffect(() => {
     setFinancialData(prev => {
       return prev.map(item => {
@@ -226,7 +226,7 @@ export default function Balanco() {
         // Agora incluindo PERDAS como um item que deve ser negativo
         if ((item.id > 2 && item.id !== 4 && item.id !== 15 && item.id !== 23 && item.id !== 24 && item.type !== 'spacer') || 
             item.description === 'PERDAS') {
-          // Garantir que o valor seja negativo
+          // Garantir que o valor seja negativo apenas na inicialização
           const value = item.value > 0 ? -Math.abs(item.value) : -Math.abs(item.value);
           return { ...item, value };
         }
@@ -352,27 +352,36 @@ export default function Balanco() {
   // Função para salvar o valor editado
   const saveEdit = () => {
     if (editingCell) {
+      // PRIMEIRO: Marcar como editado manualmente ANTES de atualizar dados
+      const editedItem = financialData.find(item => item.id === editingCell.id);
+      if (editedItem && editedItem.description) {
+        setManuallyEditedItems(prevSet => {
+          const newSet = new Set(prevSet);
+          newSet.add(editedItem.description!);
+          console.log(`Marcando "${editedItem.description}" como editado manualmente`);
+          saveManualEditsToStorage(newSet);
+          return newSet;
+        });
+      }
+
       setFinancialData(prev => {
         const newData = [...prev];
         
-        // Encontrar o item sendo editado para marcar como editado manualmente
-        const editedItem = newData.find(item => item.id === editingCell.id);
-        if (editedItem && editedItem.description) {
-          // Marcar este item como editado manualmente
-          setManuallyEditedItems(prevSet => {
-            const newSet = new Set(prevSet);
-            newSet.add(editedItem.description!);
-            console.log(`Marcando "${editedItem.description}" como editado manualmente`);
-            // Salvar no localStorage
-            saveManualEditsToStorage(newSet);
-            return newSet;
-          });
+        // Encontrar o item sendo editado para verificar se precisa ser negativo
+        const itemBeingEdited = newData.find(item => item.id === editingCell.id);
+        let valueToSave = editingCell.value;
+        
+        // Se for um item de despesa (categoria ENCERRAMENTO, exceto RECEITA/EXTRAS), garantir que seja negativo
+        if (itemBeingEdited && 
+            itemBeingEdited.category === 'ENCERRAMENTO' && 
+            !['RECEITA', 'EXTRAS'].includes(itemBeingEdited.description || '')) {
+          valueToSave = -Math.abs(editingCell.value); // Sempre negativo para despesas
         }
         
         // Atualizar o item que está sendo editado
         const updatedData = newData.map(item =>
           item.id === editingCell.id
-            ? { ...item, value: editingCell.value }
+            ? { ...item, value: valueToSave }
             : item
         );
         
@@ -678,7 +687,9 @@ export default function Balanco() {
           }
           
           // VERIFICAR se o item foi editado manualmente - se sim, NÃO sobrescrever
-          if (manuallyEditedItems.has(item.description || '')) {
+          // Verifica tanto no estado atual quanto no localStorage (proteção extra)
+          const storedEdits = loadManualEditsFromStorage();
+          if (manuallyEditedItems.has(item.description || '') || storedEdits.has(item.description || '')) {
             console.log(`Preservando valor manual de "${item.description}": ${item.value}`);
             return item; // Manter valor atual sem alterar
           }
