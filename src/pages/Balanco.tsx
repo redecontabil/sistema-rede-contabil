@@ -238,9 +238,11 @@ export default function Balanco() {
 
   // Calcular totais para as métricas principais (usando valores reais, não Math.abs)
   const calcularDespesasTotal = () => {
-    // Incluir tanto itens quanto headers da categoria ENCERRAMENTO
+    // Incluir tanto itens quanto headers da categoria ENCERRAMENTO, exceto PERDAS
     const itensEncerramento = financialData.filter(item => 
-      item.category === 'ENCERRAMENTO' && (item.type === 'item' || item.type === 'header')
+      item.category === 'ENCERRAMENTO' && 
+      (item.type === 'item' || item.type === 'header') &&
+      item.description !== 'PERDAS'
     );
     const total = itensEncerramento.reduce((acc, cur) => acc + cur.value, 0);
     return total;
