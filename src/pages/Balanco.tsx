@@ -98,56 +98,23 @@ const financialDataInitial: FinancialItem[] = [
   { id: 24, type: 'footer', description: 'LUCRO', value: 14331.25, percentage: '9.42%', editable: false, bold: true, bgColor: 'bg-[#435e19]', textColor: 'text-white' },
 ];
 
-// Chaves para o localStorage
-const STORAGE_KEY = 'balanco-financial-data';
+// Chave apenas para histórico (mantido para compatibilidade)
 const HISTORICO_STORAGE_KEY = 'balanco-historico-data';
-const MANUAL_EDITS_KEY = 'balanco-manual-edits';
 
 export default function Balanco() {
-
+  console.log('🔄 Componente Balanco iniciando...');
 
   // Função para carregar dados do localStorage
-  const loadFromStorage = (): FinancialItem[] => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        // Verificar se os dados do localStorage estão válidos
-        const parsedData = JSON.parse(stored);
-        
-        // Verificar se temos o campo OUTROS
-        const outrosItemExists = parsedData.some(item => item.description === 'OUTROS');
-        
-        if (outrosItemExists) {
-          console.log('Dados carregados do localStorage com sucesso');
-          return parsedData;
-        } else {
-          console.warn('Dados do localStorage não contém o campo OUTROS, usando dados iniciais');
-          return [...financialDataInitial];
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados do localStorage:', error);
-    }
-    return [...financialDataInitial];
-  };
+  // REMOVIDO: Funções de localStorage - usando apenas Supabase como fonte única
 
-  // Função para salvar dados no localStorage
-  const saveToStorage = (data: FinancialItem[]) => {
-    try {
-      // Verificar se temos o item OUTROS antes de salvar
-      const outrosItem = data.find(item => item.description === 'OUTROS');
-      if (!outrosItem) {
-        console.warn('Salvando dados sem o campo OUTROS!');
-      }
-      
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      console.log('Dados salvos no localStorage com sucesso');
-    } catch (error) {
-      console.error('Erro ao salvar dados no localStorage:', error);
-    }
-  };
-
-  const [financialData, setFinancialData] = useState<FinancialItem[]>(loadFromStorage);
+  const [financialData, setFinancialData] = useState<FinancialItem[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  
+  console.log('📊 Estado atual:', { 
+    isInitialLoading, 
+    financialDataLength: financialData.length,
+    hasData: financialData.length > 0 
+  });
   const [editingCell, setEditingCell] = useState<{id: number, value: number} | null>(null);
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [newItem, setNewItem] = useState<{
@@ -213,27 +180,41 @@ export default function Balanco() {
     });
   };
   
-  // Salvar no localStorage sempre que os dados mudarem
+  // Salvar no localStorage sempre que os dados mudarem (exceto durante carregamento inicial)
+  // REMOVIDO: Salvamento automático no localStorage - usando apenas Supabase
+
+  // Garantir que todos os valores de despesas e reservas sejam negativos (apenas para dados iniciais padrão)
   useEffect(() => {
-    saveToStorage(financialData);
-  }, [financialData]);
-  
-  // Garantir que todos os valores de despesas e reservas sejam negativos (dados iniciais apenas)
-  useEffect(() => {
+    // Só executar se não estamos carregando e se temos dados padrão
+    if (!isInitialLoading && financialData.length > 0) {
+      // Verificar se são dados que precisam de ajuste (dados iniciais sem ajuste)
+      const needsAdjustment = financialData.some(item => 
+        (item.category === 'ENCERRAMENTO' || item.category === 'RESERVA') && 
+        item.type !== 'spacer' && 
+        !['RECEITA', 'EXTRAS'].includes(item.description || '') &&
+        item.value > 0
+      );
+
+      if (needsAdjustment) {
+        console.log('🔧 Ajustando valores para negativos (dados iniciais)');
     setFinancialData(prev => {
       return prev.map(item => {
-        // Se for um item de despesa (ENCERRAMENTO) ou reserva (RESERVA), garantir que seja negativo
-        if ((item.category === 'ENCERRAMENTO' || item.category === 'RESERVA') && 
-            item.type !== 'spacer' && 
-            !['RECEITA', 'EXTRAS'].includes(item.description || '')) {
-          // Garantir que o valor seja negativo apenas na inicialização
-          const value = item.value > 0 ? -Math.abs(item.value) : -Math.abs(item.value);
+            // Se for um item de despesa (ENCERRAMENTO) ou reserva (RESERVA), garantir que seja negativo
+            if ((item.category === 'ENCERRAMENTO' || item.category === 'RESERVA') && 
+                item.type !== 'spacer' && 
+                !['RECEITA', 'EXTRAS'].includes(item.description || '')) {
+              // Garantir que o valor seja negativo apenas se for positivo
+              if (item.value > 0) {
+                const value = -Math.abs(item.value);
           return { ...item, value };
+              }
         }
         return item;
       });
     });
-  }, []); // Executar apenas uma vez na montagem do componente
+      }
+    }
+  }, [isInitialLoading, financialData.length]); // Executar quando carregamento inicial terminar
   
   // Foco automático no input quando está editando
   useEffect(() => {
@@ -350,18 +331,15 @@ export default function Balanco() {
   };
 
   // Função para salvar o valor editado
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editingCell) {
       // PRIMEIRO: Marcar como editado manualmente ANTES de atualizar dados
       const editedItem = financialData.find(item => item.id === editingCell.id);
       if (editedItem && editedItem.description) {
-        setManuallyEditedItems(prevSet => {
-          const newSet = new Set(prevSet);
-          newSet.add(editedItem.description!);
-          console.log(`Marcando "${editedItem.description}" como editado manualmente`);
-          saveManualEditsToStorage(newSet);
-          return newSet;
-        });
+        console.log(`📝 Marcando "${editedItem.description}" como editado manualmente`);
+        
+        // Marcar no Supabase como editado manualmente
+        await markAsManuallyEdited(editedItem.description);
       }
 
       setFinancialData(prev => {
@@ -407,8 +385,10 @@ export default function Balanco() {
           }
         }
         
-        // Sincronizar com Supabase para outros usuários
-        syncToSupabase(updatedData);
+        // Sincronizar diretamente com Supabase (principal fonte de dados)
+        setTimeout(() => {
+          debouncedSyncToSupabase(updatedData);
+        }, 200);
         
         return updatedData;
       });
@@ -431,8 +411,10 @@ export default function Balanco() {
             : item
         );
         
-        // Sincronizar com Supabase para outros usuários
-        syncToSupabase(updatedData);
+        // Sincronizar diretamente com Supabase (principal fonte de dados)
+        setTimeout(() => {
+          debouncedSyncToSupabase(updatedData);
+        }, 200);
         
         return updatedData;
       });
@@ -614,36 +596,132 @@ export default function Balanco() {
     return Math.abs(calcularReservasTotal());
   }, [financialData]);
 
-  // Função para carregar itens editados manualmente do localStorage
-  const loadManualEditsFromStorage = (): Set<string> => {
+  // Função para verificar se item foi editado manualmente (usando campo no Supabase)
+  const isItemManuallyEdited = (item: FinancialItem): boolean => {
+    return item.textColor === 'MANUALLY_EDITED';
+  };
+
+  // Função para marcar item como editado manualmente no Supabase
+  const markAsManuallyEdited = async (itemDescription: string) => {
     try {
-      const stored = localStorage.getItem(MANUAL_EDITS_KEY);
-      if (stored) {
-        const array = JSON.parse(stored);
-        return new Set(array);
+      console.log(`📝 Marcando "${itemDescription}" como editado manualmente no Supabase`);
+      
+      // Verificar estado atual antes da atualização
+      const { data: currentData, error: selectError } = await supabase
+        .from('demonstrativo_financeiro')
+        .select('description, text_color, value')
+        .eq('description', itemDescription)
+        .single();
+      
+      if (selectError) {
+        console.error('❌ Erro ao buscar item atual:', selectError);
+      } else {
+        console.log(`🔍 Estado atual de "${itemDescription}":`, currentData);
+      }
+      
+      // Atualizar o item para marcar como editado manualmente
+      const { error } = await supabase
+        .from('demonstrativo_financeiro')
+        .update({ 
+          text_color: 'MANUALLY_EDITED',
+          updated_at: new Date().toISOString()
+        })
+        .eq('description', itemDescription);
+        
+      if (error) throw error;
+      
+      console.log(`✅ "${itemDescription}" marcado como editado manualmente no Supabase`);
+      
+      // Verificar se a atualização foi aplicada
+      const { data: updatedData, error: verifyError } = await supabase
+        .from('demonstrativo_financeiro')
+        .select('description, text_color, value')
+        .eq('description', itemDescription)
+        .single();
+      
+      if (!verifyError && updatedData) {
+        console.log(`🔍 Estado após atualização de "${itemDescription}":`, updatedData);
       }
     } catch (error) {
-      console.error('Erro ao carregar edições manuais do localStorage:', error);
-    }
-    return new Set();
-  };
-
-  // Função para salvar itens editados manualmente no localStorage
-  const saveManualEditsToStorage = (editedItems: Set<string>) => {
-    try {
-      const array = Array.from(editedItems);
-      localStorage.setItem(MANUAL_EDITS_KEY, JSON.stringify(array));
-      console.log('Edições manuais salvas no localStorage:', array);
-    } catch (error) {
-      console.error('Erro ao salvar edições manuais no localStorage:', error);
+      console.error('❌ Erro ao marcar edição manual no Supabase:', error);
     }
   };
 
-  // Estado para rastrear itens editados manualmente (não devem ser sobrescritos)
-  const [manuallyEditedItems, setManuallyEditedItems] = useState<Set<string>>(loadManualEditsFromStorage);
+  // Estado para rastrear itens editados manualmente (baseado nos dados do Supabase)
+  const [manuallyEditedItems, setManuallyEditedItems] = useState<Set<string>>(new Set());
+  
+  // Atualizar lista de itens editados manualmente baseado nos dados carregados
+  useEffect(() => {
+    const editedItems = new Set<string>();
+    console.log('🔍 Verificando itens editados manualmente nos dados:', financialData.length, 'itens');
+    
+    financialData.forEach(item => {
+      console.log(`🔍 Item "${item.description}": textColor="${item.textColor}", isManuallyEdited=${isItemManuallyEdited(item)}`);
+      if (isItemManuallyEdited(item) && item.description) {
+        editedItems.add(item.description);
+        console.log(`✅ Adicionando "${item.description}" como editado manualmente`);
+      }
+    });
+    setManuallyEditedItems(editedItems);
+    console.log('🔄 Itens editados manualmente atualizados:', Array.from(editedItems));
+  }, [financialData]);
 
   // Estado para controlar se deve sincronizar com outros usuários
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Estado para indicar se uma atualização é externa (vem do Supabase)
+  const [isExternalUpdate, setIsExternalUpdate] = useState(false);
+  
+  // Ref para controlar debounce da sincronização
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reset da flag de atualização externa
+  useEffect(() => {
+    if (isExternalUpdate) {
+      const timer = setTimeout(() => {
+        setIsExternalUpdate(false);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isExternalUpdate]);
+
+  // Função para sincronização com debounce
+  const debouncedSyncToSupabase = (data: FinancialItem[]) => {
+    // Não sincronizar se for uma atualização externa
+    if (isExternalUpdate) {
+      console.log('⏸️ Pulando sincronização - atualização externa em andamento');
+      return;
+    }
+    
+    // Limpar timeout anterior se existir
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    
+    // Criar novo timeout
+    syncTimeoutRef.current = setTimeout(() => {
+      // Verificar novamente antes de sincronizar
+      if (!isExternalUpdate && !isSyncing) {
+        syncToSupabase(data);
+      }
+    }, 500); // Aguarda 500ms sem mudanças antes de sincronizar
+  };
+
+  // Função para inicializar dados padrão no Supabase
+  const initializeSupabaseData = async (): Promise<void> => {
+    try {
+      console.log('🚀 Inicializando dados padrão no Supabase...');
+      await syncToSupabase(financialDataInitial);
+      
+      toast({
+        title: "Dados inicializados",
+        description: "Dados padrão foram criados no servidor.",
+      });
+    } catch (error) {
+      console.error('❌ Erro ao inicializar dados no Supabase:', error);
+      throw error;
+    }
+  };
 
   // Função para salvar dados no Supabase para sincronização
   const syncToSupabase = async (data: FinancialItem[]) => {
@@ -651,36 +729,68 @@ export default function Balanco() {
     
     try {
       setIsSyncing(true);
+      console.log('🔄 Iniciando sincronização com Supabase...');
       
-      // Deletar todos os registros existentes e inserir novos (replace)
-      await supabase.from('balanco_dados').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      
-      // Preparar dados para inserção
-      const dataToInsert = data
-        .filter(item => item.type !== 'spacer') // Não salvar spacers
-        .map(item => ({
-          item_id: item.id,
-          description: item.description || '',
-          value: item.value,
-          type: item.type,
-          category: item.category || null,
-          editable: item.editable,
-          bold: item.bold || false
-        }));
-
-      if (dataToInsert.length > 0) {
-        const { error } = await supabase
-          .from('balanco_dados')
-          .insert(dataToInsert);
+      // Mapear dados para o formato da tabela demonstrativo_financeiro
+      const supabaseData = await Promise.all(data.map(async (item) => {
+        // Para itens editados manualmente, preservar o text_color do banco de dados
+        let textColorToSave = item.textColor || null;
         
-        if (error) {
-          console.error('Erro ao sincronizar com Supabase:', error);
+        if (item.textColor === 'MANUALLY_EDITED') {
+          // Se já está marcado como editado manualmente, manter
+          textColorToSave = 'MANUALLY_EDITED';
         } else {
-          console.log('✅ Dados sincronizados com Supabase com sucesso');
+          // Verificar se existe uma marcação manual no banco
+          try {
+            const { data: existingItem, error } = await supabase
+              .from('demonstrativo_financeiro')
+              .select('text_color')
+              .eq('item_id', item.id)
+              .single();
+            
+            if (!error && existingItem?.text_color === 'MANUALLY_EDITED') {
+              console.log(`🔒 Preservando marcação manual para "${item.description}"`);
+              textColorToSave = 'MANUALLY_EDITED';
+            }
+          } catch (e) {
+            // Ignorar erros, usar o valor original
+          }
         }
+        
+        return {
+          item_id: item.id,
+          type: item.type,
+          description: item.description || null,
+          value: item.value,
+          editable: item.editable,
+          bold: item.bold || false,
+          bg_color: item.bgColor || null,
+          text_color: textColorToSave,
+          percentage: item.percentage || null,
+          category: item.category || null
+        };
+      }));
+
+      // Usar upsert para inserir ou atualizar registros baseado no item_id
+      const { error } = await supabase
+        .from('demonstrativo_financeiro')
+        .upsert(supabaseData, { 
+          onConflict: 'item_id',
+          ignoreDuplicates: false 
+        });
+
+      if (error) {
+        throw error;
       }
+
+      console.log('✅ Dados sincronizados com Supabase com sucesso');
     } catch (error) {
-      console.error('Erro na sincronização:', error);
+      console.error('❌ Erro ao sincronizar com Supabase:', error);
+      toast({
+        title: "Erro de sincronização",
+        description: "Não foi possível sincronizar os dados com o servidor.",
+        variant: "destructive"
+      });
     } finally {
       setIsSyncing(false);
     }
@@ -689,60 +799,49 @@ export default function Balanco() {
   // Função para carregar dados do Supabase
   const loadFromSupabase = async (): Promise<FinancialItem[] | null> => {
     try {
+      console.log('📥 Carregando dados do Supabase...');
+      
       const { data, error } = await supabase
-        .from('balanco_dados')
+        .from('demonstrativo_financeiro')
         .select('*')
-        .order('item_id');
+        .order('item_id', { ascending: true });
 
       if (error) {
-        console.error('Erro ao carregar dados do Supabase:', error);
+        console.error('❌ Erro no Supabase:', error);
+        throw error;
+      }
+
+      console.log('📊 Resposta do Supabase:', data?.length || 0, 'registros encontrados');
+
+      if (!data || data.length === 0) {
+        console.log('ℹ️ Tabela demonstrativo_financeiro está vazia');
         return null;
       }
 
-      if (data && data.length > 0) {
-        // Converter dados do Supabase para formato FinancialItem
-        const convertedData: FinancialItem[] = data.map(item => ({
-          id: item.item_id,
-          type: item.type as 'header' | 'item' | 'footer' | 'spacer',
-          description: item.description,
-          value: Number(item.value),
-          editable: item.editable,
-          bold: item.bold,
-          category: item.category as CategoryType
-        }));
+      // Mapear dados do Supabase para o formato React
+      const financialItems: FinancialItem[] = data.map(item => ({
+        id: item.item_id,
+        type: item.type as 'header' | 'item' | 'footer' | 'spacer',
+        description: item.description,
+        value: Number(item.value),
+        editable: item.editable,
+        bold: item.bold,
+        bgColor: item.bg_color,
+        textColor: item.text_color,
+        percentage: item.percentage,
+        category: item.category as CategoryType
+      }));
 
-        // Adicionar spacers de volta nos locais corretos
-        const dataWithSpacers = [...convertedData];
-        
-        // Inserir spacers nas posições corretas (baseado nos dados iniciais)
-        const spacerPositions = [
-          { after: 2, id: 4 }, // Após EXTRAS
-          { after: 14, id: 15 }, // Após itens de ENCERRAMENTO  
-          { after: 22, id: 23 } // Após itens de RESERVA
-        ];
-
-        spacerPositions.forEach(pos => {
-          dataWithSpacers.splice(pos.after, 0, {
-            id: pos.id,
-            type: 'spacer',
-            value: 0,
-            editable: false
-          });
-        });
-
-        // Re-indexar IDs para manter sequência
-        const reindexed = dataWithSpacers.map((item, index) => ({
-          ...item,
-          id: index + 1
-        }));
-
-        console.log('✅ Dados carregados do Supabase');
-        return reindexed;
-      }
-
-      return null;
+      console.log('✅ Dados mapeados com sucesso:', financialItems.length, 'itens');
+      console.log('📋 Primeiros itens:', financialItems.slice(0, 3).map(i => `${i.id}: ${i.description}`));
+      
+      // Debug: Verificar itens editados manualmente carregados do Supabase
+      const manuallyEditedFromDb = financialItems.filter(item => item.textColor === 'MANUALLY_EDITED');
+      console.log('🔍 Itens marcados como editados manualmente no Supabase:', manuallyEditedFromDb.map(i => `${i.description}: ${i.textColor}`));
+      
+      return financialItems;
     } catch (error) {
-      console.error('Erro ao carregar dados do Supabase:', error);
+      console.error('❌ Erro ao carregar dados do Supabase:', error);
       return null;
     }
   };
@@ -800,17 +899,17 @@ export default function Balanco() {
           }
           
           // VERIFICAR se o item foi editado manualmente - se sim, NÃO sobrescrever
-          // Verifica tanto no estado atual quanto no localStorage (proteção extra)
-          const storedEdits = loadManualEditsFromStorage();
-          if (manuallyEditedItems.has(item.description || '') || storedEdits.has(item.description || '')) {
-            console.log(`Preservando valor manual de "${item.description}": ${item.value}`);
+          const isManualEdit = isItemManuallyEdited(item);
+          
+          if (isManualEdit) {
+            console.log(`🔒 Preservando valor manual de "${item.description}": ${item.value} (editado manualmente)`);
             return item; // Manter valor atual sem alterar
           }
           
           // Mapeamento entre as descrições na tabela de balanço e os centros de custo
           const descriptionToCentroCusto = {
             'Funcionários': 'Funcionários',
-            'Pró-labore': 'Pró-Labore',
+            'Pró-labore': 'Pró-Labore', // Tabela usa 'Pró-labore', Supabase usa 'Pró-Labore'
             'Marketing': 'Marketing',
             'Tarifa Bancária': 'Tarifa Bancária',
             'Centro de Custo Fixo': 'Centro de Custo Fixo',
@@ -827,8 +926,19 @@ export default function Balanco() {
           return item;
         });
         
-        // Salvar os dados atualizados no localStorage imediatamente
-        saveToStorage(updated);
+        // Verificar se houve mudanças reais antes de salvar
+        const hasChanges = JSON.stringify(prev) !== JSON.stringify(updated);
+        
+        if (hasChanges) {
+          console.log('💾 Sincronizando mudanças dos custos com Supabase');
+          
+          // Sincronizar com Supabase apenas se houve mudanças significativas
+          setTimeout(() => {
+            debouncedSyncToSupabase(updated);
+          }, 1000); // Aguarda 1 segundo para evitar conflito
+        } else {
+          console.log('⏸️ Nenhuma mudança nos custos detectada');
+        }
         
         return updated;
       });
@@ -845,17 +955,20 @@ export default function Balanco() {
 
   // Chama a função quando o componente é montado e também quando os dados são carregados do localStorage
   useEffect(() => {
-    // Buscar os dados do Supabase primeiro
+    // Só buscar dados dos custos após carregamento inicial completo
+    if (!isInitialLoading) {
+      console.log('⏰ Buscando dados de custos após carregamento inicial...');
     fetchTotalCentrosCusto();
     
     // Configurar um intervalo para buscar novamente periodicamente, garantindo que os dados estejam atualizados
     const intervalId = setInterval(() => {
-      console.log('Buscando dados atualizados de custos...');
+        console.log('🔄 Buscando dados atualizados de custos...');
       fetchTotalCentrosCusto();
-    }, 60000); // Buscar a cada minuto
+      }, 120000); // Buscar a cada 2 minutos (menos agressivo)
     
     return () => clearInterval(intervalId);
-  }, []);
+    }
+  }, [isInitialLoading]); // Depende do carregamento inicial
 
   // Inscreve-se para mudanças na tabela de custos
   useEffect(() => {
@@ -1002,57 +1115,169 @@ export default function Balanco() {
     };
   }, []);
 
-  // Configurar realtime subscription para sincronização entre usuários
+  // Inicialização prioritária do Supabase
   useEffect(() => {
-    // Primeiro, tentar carregar dados do Supabase na inicialização
-    const initializeFromSupabase = async () => {
-      const supabaseData = await loadFromSupabase();
-      if (supabaseData && supabaseData.length > 0) {
-        console.log('📥 Carregando dados iniciais do Supabase');
-        setFinancialData(supabaseData);
-      } else {
-        console.log('📤 Inicializando Supabase com dados locais');
-        // Se não há dados no Supabase, sincronizar dados locais
-        syncToSupabase(financialData);
+    const initializeData = async () => {
+      try {
+        setIsInitialLoading(true);
+        console.log('🚀 Iniciando carregamento de dados...');
+        
+        // SEMPRE tentar carregar do Supabase primeiro
+        const supabaseData = await loadFromSupabase();
+        
+        if (supabaseData && supabaseData.length > 0) {
+          console.log('📥 Dados carregados do Supabase com sucesso');
+          setIsExternalUpdate(true);
+          setFinancialData(supabaseData);
+        } else {
+          console.log('🚀 Supabase vazio, inicializando com dados padrão...');
+          setFinancialData(financialDataInitial);
+          await initializeSupabaseData();
+        }
+      } catch (error) {
+        console.error('❌ Erro na inicialização:', error);
+        
+        // Fallback: usar dados padrão se Supabase não estiver disponível
+        console.log('🔄 Usando dados padrão como fallback');
+        setFinancialData(financialDataInitial);
+        
+        toast({
+          title: "Erro de conexão",
+          description: "Não foi possível conectar ao servidor. Usando dados padrão.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsInitialLoading(false);
       }
     };
 
-    initializeFromSupabase();
+    initializeData();
+  }, []); // Executar apenas uma vez na montagem
 
-    // Configurar subscription para mudanças em tempo real
+  // Configurar subscription para mudanças em tempo real (apenas após carregamento inicial)
+  useEffect(() => {
+    // Só ativar subscription após carregamento inicial completar
+    if (isInitialLoading) {
+      return;
+    }
+
+    console.log('🔗 Ativando subscription em tempo real');
     const channel = supabase
-      .channel('balanco_realtime')
+      .channel('demonstrativo_financeiro_realtime')
       .on(
         'postgres_changes',
         {
           event: '*', // INSERT, UPDATE, DELETE
           schema: 'public',
-          table: 'balanco_dados'
+          table: 'demonstrativo_financeiro'
         },
         async (payload) => {
-          console.log('🔄 Detectada mudança no balanço de outro usuário:', payload);
+          console.log('🔄 Detectada mudança no demonstrativo de outro usuário:', payload);
           
-          // Recarregar dados do Supabase quando houver mudanças
-          const updatedData = await loadFromSupabase();
-          if (updatedData && !isSyncing) {
-            console.log('📥 Atualizando dados locais com mudanças de outros usuários');
-            setFinancialData(updatedData);
-            
-            // Mostrar notificação para o usuário
-            toast({
-              title: "Dados atualizados",
-              description: "O balanço foi atualizado por outro usuário.",
-              duration: 3000
-            });
+          // Evitar loop de sincronização - só atualizar se não estamos sincronizando
+          if (isSyncing) {
+            console.log('⏸️ Ignorando mudança durante sincronização local...');
+            return;
           }
+          
+          // Adicionar debounce para evitar múltiplas atualizações rápidas
+          setTimeout(async () => {
+            // Verificar novamente se ainda não estamos sincronizando
+            if (isSyncing) {
+              console.log('⏸️ Cancelando atualização - sincronização em andamento...');
+              return;
+            }
+            
+            // Recarregar dados do Supabase quando houver mudanças externas
+            const updatedData = await loadFromSupabase();
+            if (updatedData && updatedData.length > 0) {
+              console.log('📥 Atualizando dados locais com mudanças de outros usuários');
+              
+              // Marcar como atualização externa
+              setIsExternalUpdate(true);
+              setFinancialData(prev => {
+                // Só atualizar se os dados realmente mudaram
+                if (JSON.stringify(prev) !== JSON.stringify(updatedData)) {
+                  return updatedData;
+                }
+                return prev;
+              });
+              
+              // Mostrar notificação para o usuário
+              toast({
+                title: "Dados atualizados",
+                description: "O demonstrativo foi atualizado por outro usuário.",
+                duration: 3000
+              });
+            }
+          }, 100); // Debounce de 100ms
         }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      // Limpar timeout de sincronização se existir
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
     };
-  }, [isSyncing]); // Dependência do isSyncing para evitar loops
+  }, [isSyncing, isInitialLoading]); // Dependência do isSyncing e loading para evitar loops
+
+  // Mostrar loading durante inicialização
+  if (isInitialLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight mb-1">Balanço Patrimonial</h1>
+            <p className="text-muted-foreground">
+              Carregando demonstrativo financeiro...
+            </p>
+          </div>
+        </div>
+        
+        <Card>
+          <CardContent className="flex justify-center items-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Carregando dados do servidor...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Se não há dados carregados, mostrar mensagem de erro
+  if (!financialData || financialData.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight mb-1">Balanço Patrimonial</h1>
+            <p className="text-muted-foreground">
+              Erro ao carregar demonstrativo financeiro
+            </p>
+          </div>
+        </div>
+        
+        <Card>
+          <CardContent className="flex justify-center items-center h-64">
+            <div className="text-center">
+              <p className="text-muted-foreground">Nenhum dado encontrado. Verifique a conexão com o servidor.</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+              >
+                Recarregar
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -1103,9 +1328,17 @@ export default function Balanco() {
         <CardHeader className="bg-gradient-to-r from-[#A61B67]/10 to-[#D90B91]/10 dark:from-[#A61B67]/20 dark:to-[#D90B91]/20">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Demonstrativo Financeiro</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Demonstrativo Financeiro
+                {isSyncing && (
+                  <div className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    Sincronizando...
+                  </div>
+                )}
+              </CardTitle>
               <CardDescription>
-                Demonstrativo detalhado de receitas e despesas
+                Demonstrativo detalhado de receitas e despesas • Sincronizado em tempo real
               </CardDescription>
             </div>
             <Dialog open={openAddDialog} onOpenChange={setOpenAddDialog}>
@@ -1190,6 +1423,11 @@ export default function Balanco() {
                 }
 
                 const getBackgroundColor = () => {
+                  // Adicionar divisão vermelha específica entre PERDAS e ENCERRAMENTO
+                  if (item.description === 'ENCERRAMENTO' && item.type === 'item') {
+                    return 'border-t-4 border-red-600 hover:bg-rose-50/50 dark:hover:bg-rose-950/20';
+                  }
+                  
                   switch(item.category) {
                     case 'RECEITA':
                       return item.type === 'header' ? 'bg-gradient-to-r from-emerald-900/90 to-teal-900/90' : 'hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20';
@@ -1492,6 +1730,11 @@ export default function Balanco() {
                         
                         // Determinar a cor de fundo com base na categoria para linhas alternadas
                         const getRowBgColor = () => {
+                          // Adicionar divisão vermelha específica entre PERDAS e ENCERRAMENTO no histórico
+                          if (finItem.description === 'ENCERRAMENTO' && finItem.type === 'item') {
+                            return 'border-t-2 border-red-600';
+                          }
+                          
                           switch(templateItem.category) {
                             case 'RECEITA':
                               return templateItem.type === 'header' ? 'bg-emerald-900/10' : '';
@@ -1644,6 +1887,11 @@ export default function Balanco() {
                       .filter(item => item.category === 'ENCERRAMENTO')
                       .map(item => {
                         const getBgColor = () => {
+                          // Adicionar divisão vermelha específica para o item ENCERRAMENTO no modal
+                          if (item.description === 'ENCERRAMENTO' && item.type === 'item') {
+                            return 'border-t-4 border-red-600 bg-rose-50/50 dark:bg-rose-900/10';
+                          }
+                          
                           return item.type === 'header' 
                             ? 'bg-gradient-to-r from-rose-900/90 to-pink-900/90 text-white' 
                             : 'bg-rose-50/50 dark:bg-rose-900/10';
