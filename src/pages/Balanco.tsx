@@ -223,11 +223,17 @@ export default function Balanco() {
     }
   }, [editingCell]);
 
-  // Calcular o total da receita (somente o valor de RECEITA)
+  // Calcular o total da receita (RECEITA + EXTRAS - PERDAS)
   const calculateReceitaTotal = () => {
-    // RECEITA já tem as perdas subtraídas diretamente
     const receitaItem = financialData.find(item => item.description === 'RECEITA');
-    return receitaItem ? receitaItem.value : 0;
+    const extrasItem = financialData.find(item => item.description === 'EXTRAS');
+    const perdasItem = financialData.find(item => item.description === 'PERDAS');
+    
+    const receita = receitaItem ? receitaItem.value : 0;
+    const extras = extrasItem ? extrasItem.value : 0;
+    const perdas = perdasItem ? perdasItem.value : 0;
+    
+    return receita + extras - Math.abs(perdas);
   };
 
   // Calcular totais para as métricas principais (usando valores reais, não Math.abs)
@@ -255,25 +261,14 @@ export default function Balanco() {
     return receita;
   };
 
-  // Calcular o Lucro e a Margem de Lucro (subtrai todos os itens abaixo de EXTRAS pelo valor absoluto)
+  // Calcular o Lucro usando os valores dos cards (Receita Total - Despesas - Reservas)
   const calculateLucro = () => {
-    // Encontrar o índice do item EXTRAS
-    const extrasIndex = financialData.findIndex(item => item.description === 'EXTRAS');
+    const receitaTotal = calculateReceitaTotal();
+    const despesasTotal = Math.abs(calcularDespesasTotal()); // Usar valor absoluto das despesas
+    const reservasTotal = Math.abs(calcularReservasTotal()); // Usar valor absoluto das reservas
     
-    // Somar os valores absolutos de todos os itens abaixo de EXTRAS (exceto spacers e o próprio Lucro)
-    // Agora incluindo PERDAS como despesa
-    const totalDespesas = financialData
-      .slice(extrasIndex + 1)
-      .filter(item => 
-        item.type !== 'spacer' && 
-        item.description !== 'LUCRO'
-      )
-      .reduce((acc, cur) => acc + Math.abs(cur.value || 0), 0);
-
-    const receitaBruta = calculateReceitaBruta();
-    // Garantir que o lucro seja sempre um valor positivo para exibição
-    const lucro = receitaBruta - totalDespesas;
-    const percentage = receitaBruta !== 0 ? (lucro / receitaBruta) * 100 : 0;
+    const lucro = receitaTotal - despesasTotal - reservasTotal;
+    const percentage = receitaTotal !== 0 ? (lucro / receitaTotal) * 100 : 0;
 
     return {
       value: lucro, // Mantemos o valor original (pode ser negativo) para cálculos
@@ -1040,15 +1035,11 @@ export default function Balanco() {
       setFinancialData(prev => {
         const newData = [...prev];
         
-        // Obter o valor atual de EXTRAS
-        const extrasItem = newData.find(item => item.description === 'EXTRAS');
-        const extrasValue = extrasItem ? extrasItem.value : 0;
-        
-        // Atualizar RECEITA (id: 1) com o valor base + honorários - perdas + extras
+        // Atualizar RECEITA (id: 1) com o valor base + honorários - perdas (SEM EXTRAS)
         const receitaIndex = newData.findIndex(item => item.id === 1);
         if (receitaIndex !== -1) {
-          const valorFinal = valorBase + totalHonorariosEntrada - totalPerdasSaida + extrasValue;
-          console.log(`Atualizando RECEITA para ${valorFinal} (${valorBase} + ${totalHonorariosEntrada} - ${totalPerdasSaida} + ${extrasValue})`);
+          const valorFinal = valorBase + totalHonorariosEntrada - totalPerdasSaida;
+          console.log(`Atualizando RECEITA para ${valorFinal} (${valorBase} + ${totalHonorariosEntrada} - ${totalPerdasSaida})`);
           newData[receitaIndex] = {
             ...newData[receitaIndex],
             value: valorFinal
@@ -1296,7 +1287,7 @@ export default function Balanco() {
         <StatCard
           title="Receita Total"
           value={`R$ ${receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          description="Receita bruta + extras"
+          description="Receita + extras - perdas"
           icon={<DollarSign size={18} className="text-emerald-500" />}
           className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-100 dark:border-emerald-900/30"
         />
