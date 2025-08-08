@@ -98,54 +98,14 @@ const financialDataInitial: FinancialItem[] = [
   { id: 24, type: 'footer', description: 'LUCRO', value: 14331.25, percentage: '9.42%', editable: false, bold: true, bgColor: 'bg-[#435e19]', textColor: 'text-white' },
 ];
 
-// Chaves para o localStorage
-const STORAGE_KEY = 'balanco-financial-data';
+// Chave apenas para histórico (mantido para compatibilidade)
 const HISTORICO_STORAGE_KEY = 'balanco-historico-data';
-const MANUAL_EDITS_KEY = 'balanco-manual-edits';
 
 export default function Balanco() {
   console.log('🔄 Componente Balanco iniciando...');
 
   // Função para carregar dados do localStorage
-  const loadFromStorage = (): FinancialItem[] => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        // Verificar se os dados do localStorage estão válidos
-        const parsedData = JSON.parse(stored);
-        
-        // Verificar se temos o campo OUTROS
-        const outrosItemExists = parsedData.some(item => item.description === 'OUTROS');
-        
-        if (outrosItemExists) {
-          console.log('Dados carregados do localStorage com sucesso');
-          return parsedData;
-        } else {
-          console.warn('Dados do localStorage não contém o campo OUTROS, usando dados iniciais');
-          return [...financialDataInitial];
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados do localStorage:', error);
-    }
-    return [...financialDataInitial];
-  };
-
-  // Função para salvar dados no localStorage
-  const saveToStorage = (data: FinancialItem[]) => {
-    try {
-      // Verificar se temos o item OUTROS antes de salvar
-      const outrosItem = data.find(item => item.description === 'OUTROS');
-      if (!outrosItem) {
-        console.warn('Salvando dados sem o campo OUTROS!');
-      }
-      
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      console.log('Dados salvos no localStorage com sucesso');
-    } catch (error) {
-      console.error('Erro ao salvar dados no localStorage:', error);
-    }
-  };
+  // REMOVIDO: Funções de localStorage - usando apenas Supabase como fonte única
 
   const [financialData, setFinancialData] = useState<FinancialItem[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -220,7 +180,8 @@ export default function Balanco() {
     });
   };
   
-
+  // Salvar no localStorage sempre que os dados mudarem (exceto durante carregamento inicial)
+  // REMOVIDO: Salvamento automático no localStorage - usando apenas Supabase
 
   // Garantir que todos os valores de despesas e reservas sejam negativos (apenas para dados iniciais padrão)
   useEffect(() => {
@@ -236,8 +197,8 @@ export default function Balanco() {
 
       if (needsAdjustment) {
         console.log('🔧 Ajustando valores para negativos (dados iniciais)');
-        setFinancialData(prev => {
-          return prev.map(item => {
+    setFinancialData(prev => {
+      return prev.map(item => {
             // Se for um item de despesa (ENCERRAMENTO) ou reserva (RESERVA), garantir que seja negativo
             if ((item.category === 'ENCERRAMENTO' || item.category === 'RESERVA') && 
                 item.type !== 'spacer' && 
@@ -245,12 +206,12 @@ export default function Balanco() {
               // Garantir que o valor seja negativo apenas se for positivo
               if (item.value > 0) {
                 const value = -Math.abs(item.value);
-                return { ...item, value };
+          return { ...item, value };
               }
-            }
-            return item;
-          });
-        });
+        }
+        return item;
+      });
+    });
       }
     }
   }, [isInitialLoading, financialData.length]); // Executar quando carregamento inicial terminar
@@ -370,18 +331,15 @@ export default function Balanco() {
   };
 
   // Função para salvar o valor editado
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editingCell) {
       // PRIMEIRO: Marcar como editado manualmente ANTES de atualizar dados
       const editedItem = financialData.find(item => item.id === editingCell.id);
       if (editedItem && editedItem.description) {
-        setManuallyEditedItems(prevSet => {
-          const newSet = new Set(prevSet);
-          newSet.add(editedItem.description!);
-          console.log(`Marcando "${editedItem.description}" como editado manualmente`);
-          saveManualEditsToStorage(newSet);
-          return newSet;
-        });
+        console.log(`📝 Marcando "${editedItem.description}" como editado manualmente`);
+        
+        // Marcar no Supabase como editado manualmente
+        await markAsManuallyEdited(editedItem.description);
       }
 
       setFinancialData(prev => {
@@ -427,11 +385,8 @@ export default function Balanco() {
           }
         }
         
-        // Sincronizar com Supabase para outros usuários (com debounce)
-        // Aguardar um pouco para evitar conflito com outras operações
-        console.log('💾 Valor editado manualmente, sincronizando com Supabase...');
+        // Sincronizar diretamente com Supabase (principal fonte de dados)
         setTimeout(() => {
-          console.log('🚀 Iniciando sincronização do valor editado com Supabase');
           debouncedSyncToSupabase(updatedData);
         }, 200);
         
@@ -456,11 +411,8 @@ export default function Balanco() {
             : item
         );
         
-        // Sincronizar com Supabase para outros usuários (com debounce)
-        // Aguardar um pouco para evitar conflito com outras operações
-        console.log('💾 Descrição editada manualmente, sincronizando com Supabase...');
+        // Sincronizar diretamente com Supabase (principal fonte de dados)
         setTimeout(() => {
-          console.log('🚀 Iniciando sincronização da descrição editada com Supabase');
           debouncedSyncToSupabase(updatedData);
         }, 200);
         
@@ -644,33 +596,75 @@ export default function Balanco() {
     return Math.abs(calcularReservasTotal());
   }, [financialData]);
 
-  // Função para carregar itens editados manualmente do localStorage
-  const loadManualEditsFromStorage = (): Set<string> => {
+  // Função para verificar se item foi editado manualmente (usando campo no Supabase)
+  const isItemManuallyEdited = (item: FinancialItem): boolean => {
+    return item.textColor === 'MANUALLY_EDITED';
+  };
+
+  // Função para marcar item como editado manualmente no Supabase
+  const markAsManuallyEdited = async (itemDescription: string) => {
     try {
-      const stored = localStorage.getItem(MANUAL_EDITS_KEY);
-      if (stored) {
-        const array = JSON.parse(stored);
-        return new Set(array);
+      console.log(`📝 Marcando "${itemDescription}" como editado manualmente no Supabase`);
+      
+      // Verificar estado atual antes da atualização
+      const { data: currentData, error: selectError } = await supabase
+        .from('demonstrativo_financeiro')
+        .select('description, text_color, value')
+        .eq('description', itemDescription)
+        .single();
+      
+      if (selectError) {
+        console.error('❌ Erro ao buscar item atual:', selectError);
+      } else {
+        console.log(`🔍 Estado atual de "${itemDescription}":`, currentData);
+      }
+      
+      // Atualizar o item para marcar como editado manualmente
+      const { error } = await supabase
+        .from('demonstrativo_financeiro')
+        .update({ 
+          text_color: 'MANUALLY_EDITED',
+          updated_at: new Date().toISOString()
+        })
+        .eq('description', itemDescription);
+        
+      if (error) throw error;
+      
+      console.log(`✅ "${itemDescription}" marcado como editado manualmente no Supabase`);
+      
+      // Verificar se a atualização foi aplicada
+      const { data: updatedData, error: verifyError } = await supabase
+        .from('demonstrativo_financeiro')
+        .select('description, text_color, value')
+        .eq('description', itemDescription)
+        .single();
+      
+      if (!verifyError && updatedData) {
+        console.log(`🔍 Estado após atualização de "${itemDescription}":`, updatedData);
       }
     } catch (error) {
-      console.error('Erro ao carregar edições manuais do localStorage:', error);
-    }
-    return new Set();
-  };
-
-  // Função para salvar itens editados manualmente no localStorage
-  const saveManualEditsToStorage = (editedItems: Set<string>) => {
-    try {
-      const array = Array.from(editedItems);
-      localStorage.setItem(MANUAL_EDITS_KEY, JSON.stringify(array));
-      console.log('Edições manuais salvas no localStorage:', array);
-    } catch (error) {
-      console.error('Erro ao salvar edições manuais no localStorage:', error);
+      console.error('❌ Erro ao marcar edição manual no Supabase:', error);
     }
   };
 
-  // Estado para rastrear itens editados manualmente (não devem ser sobrescritos)
-  const [manuallyEditedItems, setManuallyEditedItems] = useState<Set<string>>(loadManualEditsFromStorage);
+  // Estado para rastrear itens editados manualmente (baseado nos dados do Supabase)
+  const [manuallyEditedItems, setManuallyEditedItems] = useState<Set<string>>(new Set());
+  
+  // Atualizar lista de itens editados manualmente baseado nos dados carregados
+  useEffect(() => {
+    const editedItems = new Set<string>();
+    console.log('🔍 Verificando itens editados manualmente nos dados:', financialData.length, 'itens');
+    
+    financialData.forEach(item => {
+      console.log(`🔍 Item "${item.description}": textColor="${item.textColor}", isManuallyEdited=${isItemManuallyEdited(item)}`);
+      if (isItemManuallyEdited(item) && item.description) {
+        editedItems.add(item.description);
+        console.log(`✅ Adicionando "${item.description}" como editado manualmente`);
+      }
+    });
+    setManuallyEditedItems(editedItems);
+    console.log('🔄 Itens editados manualmente atualizados:', Array.from(editedItems));
+  }, [financialData]);
 
   // Estado para controlar se deve sincronizar com outros usuários
   const [isSyncing, setIsSyncing] = useState(false);
@@ -680,21 +674,6 @@ export default function Balanco() {
   
   // Ref para controlar debounce da sincronização
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Salvar no localStorage sempre que os dados mudarem (exceto durante carregamento inicial ou atualização externa)
-  useEffect(() => {
-    // Não salvar durante o carregamento inicial ou atualização externa
-    if (isInitialLoading || isExternalUpdate) {
-      console.log('⏸️ Pulando salvamento no localStorage - carregamento inicial ou atualização externa');
-      return;
-    }
-    
-    // Só salvar se temos dados válidos
-    if (financialData.length > 0) {
-      console.log('💾 Salvando dados atualizados no localStorage');
-      saveToStorage(financialData);
-    }
-  }, [financialData, isInitialLoading, isExternalUpdate]);
 
   // Reset da flag de atualização externa
   useEffect(() => {
@@ -708,39 +687,22 @@ export default function Balanco() {
 
   // Função para sincronização com debounce
   const debouncedSyncToSupabase = (data: FinancialItem[]) => {
-    console.log('🔄 debouncedSyncToSupabase chamado, verificando condições...');
-    console.log('📊 Estado atual:', { isExternalUpdate, isSyncing, dataLength: data.length });
-    
     // Não sincronizar se for uma atualização externa
     if (isExternalUpdate) {
       console.log('⏸️ Pulando sincronização - atualização externa em andamento');
       return;
     }
     
-    // Não sincronizar se já estiver sincronizando
-    if (isSyncing) {
-      console.log('⏸️ Pulando sincronização - sincronização já em andamento');
-      return;
-    }
-    
     // Limpar timeout anterior se existir
     if (syncTimeoutRef.current) {
-      console.log('🧹 Limpando timeout anterior de sincronização');
       clearTimeout(syncTimeoutRef.current);
     }
     
-    console.log('⏰ Agendando sincronização para 500ms...');
     // Criar novo timeout
     syncTimeoutRef.current = setTimeout(() => {
-      console.log('⚡ Timeout executado, verificando condições finais...');
-      console.log('📊 Estado final:', { isExternalUpdate, isSyncing });
-      
       // Verificar novamente antes de sincronizar
       if (!isExternalUpdate && !isSyncing) {
-        console.log('✅ Iniciando sincronização efetiva com Supabase');
         syncToSupabase(data);
-      } else {
-        console.log('❌ Sincronização cancelada - condições mudaram');
       }
     }, 500); // Aguarda 500ms sem mudanças antes de sincronizar
   };
@@ -770,17 +732,43 @@ export default function Balanco() {
       console.log('🔄 Iniciando sincronização com Supabase...');
       
       // Mapear dados para o formato da tabela demonstrativo_financeiro
-      const supabaseData = data.map(item => ({
-        item_id: item.id,
-        type: item.type,
-        description: item.description || null,
-        value: item.value,
-        editable: item.editable,
-        bold: item.bold || false,
-        bg_color: item.bgColor || null,
-        text_color: item.textColor || null,
-        percentage: item.percentage || null,
-        category: item.category || null
+      const supabaseData = await Promise.all(data.map(async (item) => {
+        // Para itens editados manualmente, preservar o text_color do banco de dados
+        let textColorToSave = item.textColor || null;
+        
+        if (item.textColor === 'MANUALLY_EDITED') {
+          // Se já está marcado como editado manualmente, manter
+          textColorToSave = 'MANUALLY_EDITED';
+        } else {
+          // Verificar se existe uma marcação manual no banco
+          try {
+            const { data: existingItem, error } = await supabase
+              .from('demonstrativo_financeiro')
+              .select('text_color')
+              .eq('item_id', item.id)
+              .single();
+            
+            if (!error && existingItem?.text_color === 'MANUALLY_EDITED') {
+              console.log(`🔒 Preservando marcação manual para "${item.description}"`);
+              textColorToSave = 'MANUALLY_EDITED';
+            }
+          } catch (e) {
+            // Ignorar erros, usar o valor original
+          }
+        }
+        
+        return {
+          item_id: item.id,
+          type: item.type,
+          description: item.description || null,
+          value: item.value,
+          editable: item.editable,
+          bold: item.bold || false,
+          bg_color: item.bgColor || null,
+          text_color: textColorToSave,
+          percentage: item.percentage || null,
+          category: item.category || null
+        };
       }));
 
       // Usar upsert para inserir ou atualizar registros baseado no item_id
@@ -847,6 +835,10 @@ export default function Balanco() {
       console.log('✅ Dados mapeados com sucesso:', financialItems.length, 'itens');
       console.log('📋 Primeiros itens:', financialItems.slice(0, 3).map(i => `${i.id}: ${i.description}`));
       
+      // Debug: Verificar itens editados manualmente carregados do Supabase
+      const manuallyEditedFromDb = financialItems.filter(item => item.textColor === 'MANUALLY_EDITED');
+      console.log('🔍 Itens marcados como editados manualmente no Supabase:', manuallyEditedFromDb.map(i => `${i.description}: ${i.textColor}`));
+      
       return financialItems;
     } catch (error) {
       console.error('❌ Erro ao carregar dados do Supabase:', error);
@@ -907,11 +899,9 @@ export default function Balanco() {
           }
           
           // VERIFICAR se o item foi editado manualmente - se sim, NÃO sobrescrever
-          // Verifica tanto no estado atual quanto no localStorage (proteção extra)
-          const storedEdits = loadManualEditsFromStorage();
-          const isManuallyEdited = manuallyEditedItems.has(item.description || '') || storedEdits.has(item.description || '');
+          const isManualEdit = isItemManuallyEdited(item);
           
-          if (isManuallyEdited) {
+          if (isManualEdit) {
             console.log(`🔒 Preservando valor manual de "${item.description}": ${item.value} (editado manualmente)`);
             return item; // Manter valor atual sem alterar
           }
@@ -940,13 +930,12 @@ export default function Balanco() {
         const hasChanges = JSON.stringify(prev) !== JSON.stringify(updated);
         
         if (hasChanges) {
-          console.log('💾 Salvando mudanças dos custos no localStorage');
-          saveToStorage(updated);
+          console.log('💾 Sincronizando mudanças dos custos com Supabase');
           
           // Sincronizar com Supabase apenas se houve mudanças significativas
           setTimeout(() => {
             debouncedSyncToSupabase(updated);
-          }, 2000); // Aguarda 2 segundos para evitar conflito com outras operações
+          }, 1000); // Aguarda 1 segundo para evitar conflito
         } else {
           console.log('⏸️ Nenhuma mudança nos custos detectada');
         }
@@ -969,15 +958,15 @@ export default function Balanco() {
     // Só buscar dados dos custos após carregamento inicial completo
     if (!isInitialLoading) {
       console.log('⏰ Buscando dados de custos após carregamento inicial...');
-      fetchTotalCentrosCusto();
-      
-      // Configurar um intervalo para buscar novamente periodicamente, garantindo que os dados estejam atualizados
-      const intervalId = setInterval(() => {
+    fetchTotalCentrosCusto();
+    
+    // Configurar um intervalo para buscar novamente periodicamente, garantindo que os dados estejam atualizados
+    const intervalId = setInterval(() => {
         console.log('🔄 Buscando dados atualizados de custos...');
-        fetchTotalCentrosCusto();
+      fetchTotalCentrosCusto();
       }, 120000); // Buscar a cada 2 minutos (menos agressivo)
-      
-      return () => clearInterval(intervalId);
+    
+    return () => clearInterval(intervalId);
     }
   }, [isInitialLoading]); // Depende do carregamento inicial
 
@@ -1141,41 +1130,20 @@ export default function Balanco() {
           setIsExternalUpdate(true);
           setFinancialData(supabaseData);
         } else {
-          console.log('📤 Supabase vazio, verificando dados locais...');
-          
-          // Tentar carregar do localStorage apenas como fallback
-          const localData = loadFromStorage();
-          
-          // Verificar se os dados locais são diferentes dos dados iniciais padrão
-          const hasValidLocalData = localData.length > 0 && 
-            JSON.stringify(localData) !== JSON.stringify(financialDataInitial);
-          
-          if (hasValidLocalData) {
-            console.log('📤 Dados locais encontrados, sincronizando com Supabase...');
-            setFinancialData(localData);
-            await syncToSupabase(localData);
-          } else {
-            console.log('🚀 Inicializando com dados padrão...');
-            setFinancialData(financialDataInitial);
-            await initializeSupabaseData();
-          }
+          console.log('🚀 Supabase vazio, inicializando com dados padrão...');
+          setFinancialData(financialDataInitial);
+          await initializeSupabaseData();
         }
       } catch (error) {
         console.error('❌ Erro na inicialização:', error);
         
-        // Fallback final: tentar localStorage, senão usar dados padrão
-        const localData = loadFromStorage();
-        if (localData.length > 0) {
-          console.log('🔄 Usando dados locais como fallback');
-          setFinancialData(localData);
-        } else {
-          console.log('🔄 Usando dados padrão como fallback final');
-          setFinancialData(financialDataInitial);
-        }
+        // Fallback: usar dados padrão se Supabase não estiver disponível
+        console.log('🔄 Usando dados padrão como fallback');
+        setFinancialData(financialDataInitial);
         
         toast({
-          title: "Modo offline",
-          description: "Trabalhando com dados locais. Sincronização indisponível.",
+          title: "Erro de conexão",
+          description: "Não foi possível conectar ao servidor. Usando dados padrão.",
           variant: "destructive"
         });
       } finally {
