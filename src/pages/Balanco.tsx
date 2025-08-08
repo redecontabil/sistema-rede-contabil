@@ -644,6 +644,36 @@ export default function Balanco() {
     }
   };
 
+  // Função para remover marcação manual (temporária)
+  const removeManualEditFlag = async (itemDescription: string) => {
+    try {
+      console.log(`🔓 Removendo marcação manual de "${itemDescription}" no Supabase`);
+      
+      const { error } = await supabase
+        .from('demonstrativo_financeiro')
+        .update({ 
+          text_color: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('description', itemDescription);
+
+      if (error) throw error;
+      
+      console.log(`✅ Marcação manual removida de "${itemDescription}" no Supabase`);
+      
+      // Recarregar dados para atualizar o estado local
+      setTimeout(async () => {
+        const updatedData = await loadFromSupabase();
+        if (updatedData && updatedData.length > 0) {
+          setFinancialData(updatedData);
+        }
+      }, 500);
+      
+    } catch (error) {
+      console.error('❌ Erro ao remover marcação manual no Supabase:', error);
+    }
+  };
+
   // Estado para rastrear itens editados manualmente (baseado nos dados do Supabase)
   const [manuallyEditedItems, setManuallyEditedItems] = useState<Set<string>>(new Set());
   
@@ -885,6 +915,7 @@ export default function Balanco() {
       console.log('Totais calculados:', totais);
       console.log('Valor OUTROS:', totalOutros);
       console.log('Itens editados manualmente:', manuallyEditedItems);
+      console.log('📋 Valores únicos de centro_custo na base:', [...new Set(data.map(item => item.centro_custo))].filter(Boolean));
 
       // Atualiza os valores na tabela de balanço (como valores negativos)
       setFinancialData(prev => {
@@ -916,6 +947,9 @@ export default function Balanco() {
           };
 
           const centroCusto = descriptionToCentroCusto[item.description];
+          if (item.description === 'Pró-labore') {
+            console.log(`🔍 Debug Pró-labore: centroCusto="${centroCusto}", total=${totais[centroCusto]}, temValor=${totais[centroCusto] !== undefined}`);
+          }
           if (centroCusto && totais[centroCusto] !== undefined) {
             console.log(`Atualizando "${item.description}" com valor do Supabase: -${totais[centroCusto]}`);
             return { ...item, value: -totais[centroCusto] };
@@ -1119,9 +1153,16 @@ export default function Balanco() {
         const supabaseData = await loadFromSupabase();
         
         if (supabaseData && supabaseData.length > 0) {
-          console.log('📥 Dados carregados do Supabase com sucesso');
-          setIsExternalUpdate(true);
-          setFinancialData(supabaseData);
+                  console.log('📥 Dados carregados do Supabase com sucesso');
+        setIsExternalUpdate(true);
+        setFinancialData(supabaseData);
+        
+        // Remover marcação manual do Pró-labore para permitir atualização automática
+        const proLaboreItem = supabaseData.find(item => item.description === 'Pró-labore');
+        if (proLaboreItem && proLaboreItem.textColor === 'MANUALLY_EDITED') {
+          console.log('🔓 Removendo marcação manual do Pró-labore para permitir atualização automática');
+          await removeManualEditFlag('Pró-labore');
+        }
         } else {
           console.log('🚀 Supabase vazio, inicializando com dados padrão...');
           setFinancialData(financialDataInitial);
