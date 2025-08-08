@@ -848,14 +848,14 @@ export default function Balanco() {
     try {
       // Lista de todos os centros de custo específicos que queremos buscar
       const centrosCustoEspecificos = [
-        'Funcionários',
-        'Pró-Labore',
-        'Marketing',
+        'Centro de Custo - Funcionários',
+        'Centro de Custo - Pró-Labore',
+        'Centro de Custo - Marketing',
         'Tarifa Bancária',
         'Centro de Custo Fixo',
         'Centro de Custo Variável',
-        'Centro de Custo Certificado Digital',
-        'Recrutamento e Seleção'
+        'Centro de Custo - Certificado Digital',
+        'Centro de Custo - Recrutamento e Seleção'
       ];
 
       // Busca TODOS os registros da tabela de custos
@@ -905,14 +905,14 @@ export default function Balanco() {
           
           // Mapeamento entre as descrições na tabela de balanço e os centros de custo
           const descriptionToCentroCusto = {
-            'Funcionários': 'Funcionários',
-            'Pró-labore': 'Pró-Labore', // Tabela usa 'Pró-labore', Supabase usa 'Pró-Labore'
-            'Marketing': 'Marketing',
+            'Funcionários': 'Centro de Custo - Funcionários',
+            'Pró-labore': 'Centro de Custo - Pró-Labore', // Tabela usa 'Pró-labore', Supabase usa 'Centro de Custo - Pró-Labore'
+            'Marketing': 'Centro de Custo - Marketing',
             'Tarifa Bancária': 'Tarifa Bancária',
             'Centro de Custo Fixo': 'Centro de Custo Fixo',
             'Centro de Custo Variável': 'Centro de Custo Variável',
-            'Centro de Custo Certificado Digital': 'Centro de Custo Certificado Digital',
-            'Recrutamento e Seleção': 'Recrutamento e Seleção'
+            'Centro de Custo Certificado Digital': 'Centro de Custo - Certificado Digital',
+            'Recrutamento e Seleção': 'Centro de Custo - Recrutamento e Seleção'
           };
 
           const centroCusto = descriptionToCentroCusto[item.description];
