@@ -439,6 +439,12 @@ export default function Proposta() {
         if (!proposta.comissao) return false;
         return proposta.comissao.toLowerCase() === activeComissaoFilter.toLowerCase();
       });
+
+      // Quando filtrar por comissão, sempre definir origem como "Indicação"
+      propostas = propostas.map(proposta => ({
+        ...proposta,
+        origem: "Indicação"
+      }));
     }
 
     if (filtroResponsavel) {
@@ -536,6 +542,12 @@ export default function Proposta() {
         if (!proposta.comissao) return false;
         return proposta.comissao.toLowerCase() === activeComissaoFilter.toLowerCase();
       });
+
+      // Quando filtrar por comissão, sempre definir origem como "Indicação"
+      propostas = propostas.map(proposta => ({
+        ...proposta,
+        origem: "Indicação"
+      }));
     }
 
     // Aplicar outros filtros ativos
@@ -954,7 +966,7 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
   const filterByComissao = (comissao: "todas" | "paga" | "enviada_dp" | "pendente" | "dispensada") => {
     setActiveComissaoFilter(comissao);
     let propostas = propostasData.filter(proposta => proposta.tipo_proposta === tipoTabela);
-    
+
     // Aplicar filtro de status se estiver ativo
     if (activeFilter !== "todas") {
       if (tipoTabela === "entrada") {
@@ -964,7 +976,7 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
           "aprovado": "aprovado",
           "reprovado": "reprovado"
         };
-        
+
         const dbStatus = statusMap[activeFilter] || activeFilter;
         propostas = propostas.filter(proposta => proposta.status === dbStatus);
       } else {
@@ -978,6 +990,13 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
         if (!proposta.comissao) return false;
         return proposta.comissao.toLowerCase() === comissao.toLowerCase();
       });
+
+      // Quando filtrar por comissão, sempre definir origem como "Indicação"
+      // Isso será aplicado apenas quando o filtro de comissão for diferente de "todas"
+      propostas = propostas.map(proposta => ({
+        ...proposta,
+        origem: "Indicação"
+      }));
     }
 
     // Ordenar por data decrescente
@@ -1662,7 +1681,7 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
                 <div className="space-y-2">
                   <Label htmlFor="tipo_publico">Tipo de Público</Label>
                   <Select
-                    value={form.watch("tipo_publico")}
+                    value={form.watch("tipo_publico") || ""}
                     onValueChange={(value) => form.setValue("tipo_publico", value)}
                   >
                     <SelectTrigger>
@@ -1681,7 +1700,7 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
                 <div className="space-y-2 col-span-2">
                   <Label htmlFor="origem">Origem</Label>
                   <Select
-                    value={form.watch("origem")}
+                    value={form.watch("origem") || ""}
                     onValueChange={(value) => form.setValue("origem", value)}
                   >
                     <SelectTrigger>
@@ -1702,7 +1721,7 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
                 <div className="space-y-2">
                   <Label htmlFor="quem_indicou">Quem Indicou</Label>
                   <Select
-                    value={form.watch("quem_indicou")}
+                    value={form.watch("quem_indicou") || ""}
                     onValueChange={(value) => form.setValue("quem_indicou", value)}
                   >
                     <SelectTrigger>
@@ -1732,7 +1751,10 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="comissao">Comissão</Label>
-                  <Select onValueChange={(value: "" | "paga" | "enviada_dp" | "pendente" | "dispensada") => form.setValue("comissao", value)}>
+                  <Select
+                    value={form.watch("comissao") || ""}
+                    onValueChange={(value: "" | "paga" | "enviada_dp" | "pendente" | "dispensada") => form.setValue("comissao", value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
@@ -1748,7 +1770,7 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
                 <div className="space-y-2">
                   <Label htmlFor="responsavel">Responsável</Label>
                   <Select
-                    value={form.watch("responsavel")}
+                    value={form.watch("responsavel") || ""}
                     onValueChange={(value) => form.setValue("responsavel", value)}
                   >
                     <SelectTrigger>
@@ -1767,7 +1789,7 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
                 <div className="space-y-2">
                   <Label htmlFor="tributacao">Tributação</Label>
                   <Select
-                    value={form.watch("tributacao")}
+                    value={form.watch("tributacao") || ""}
                     onValueChange={(value) => form.setValue("tributacao", value)}
                   >
                     <SelectTrigger>
@@ -1841,7 +1863,10 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="tipo_cliente">Tipo de Serviço</Label>
-                  <Select onValueChange={(value) => form.setValue("tipo_cliente", value)}>
+                  <Select
+                    value={form.watch("tipo_cliente") || ""}
+                    onValueChange={(value) => form.setValue("tipo_cliente", value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
@@ -1894,8 +1919,8 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
               <div className="grid grid-cols-1 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="status">Status</Label>
-                  <Select 
-                    value={form.watch("status")} 
+                  <Select
+                    value={form.watch("status") || ""}
                     onValueChange={(value) => form.setValue("status", value)}
                   >
                     <SelectTrigger>
@@ -1968,7 +1993,10 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="evento">Evento</Label>
-                <Select onValueChange={(value) => exitForm.setValue("evento", value)}>
+                <Select
+                  value={exitForm.watch("evento") || ""}
+                  onValueChange={(value) => exitForm.setValue("evento", value)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
@@ -2002,7 +2030,10 @@ const onSubmitNewProposal = async (values: PropostaFormData) => {
 
             <div className="grid gap-2">
               <Label htmlFor="motivo">Motivo</Label>
-              <Select onValueChange={(value) => exitForm.setValue("motivo", value)}>
+              <Select
+                value={exitForm.watch("motivo") || ""}
+                onValueChange={(value) => exitForm.setValue("motivo", value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>

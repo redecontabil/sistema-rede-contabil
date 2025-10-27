@@ -13,10 +13,13 @@ import TributacaoChart from "@/components/dashboard/TributacaoChart";
 import TopOrigensChart from '@/components/charts/TopOrigensChart';
 import PropostasTemporalChart from '@/components/charts/PropostasTemporalChart';
 
-// Hooks personalizados 
+// Hooks personalizados
 import { useGreeting } from "@/hooks/useGreeting";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { toast } from "sonner";
+
+// Supabase client
+import { supabase } from "@/lib/supabaseClient";
 
 // Configurações de cores para gráficos
 const PIE_COLORS = ['#A61B67', '#D90B91', '#03658C', '#049DBF'];
@@ -67,66 +70,80 @@ export default function Dashboard() {
     margemLucroProjetada: '0%'
   });
 
-  // Função para carregar dados do localStorage do Balanço
-  const loadBalancoData = useCallback(() => {
+  // Função para buscar dados do lucro diretamente do Supabase
+  const loadBalancoDataFromSupabase = useCallback(async () => {
     try {
-      const stored = localStorage.getItem('balanco-financial-data');
-      
-      if (stored) {
-        const data = JSON.parse(stored);
-        const lucroItem = data.find((item: any) => item.id === 24);
-        
-        if (lucroItem && lucroItem.value !== undefined) {
-          const novoLucroProjetado = `R$ ${Math.abs(lucroItem.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-          const novaMargemLucroProjetada = lucroItem.percentage || '0%';
-          
-          setLocalStatsData(prevState => {
-            // Verificar se os valores são diferentes antes de atualizar o estado
-            if (novoLucroProjetado !== prevState.lucroProjetado || 
-                novaMargemLucroProjetada !== prevState.margemLucroProjetada) {
-              console.log('Atualizando dados do balanço:', { 
-                lucroProjetado: novoLucroProjetado, 
-                margemLucroProjetada: novaMargemLucroProjetada 
-              });
-              
-              return {
-                lucroProjetado: novoLucroProjetado,
-                margemLucroProjetada: novaMargemLucroProjetada
-              };
-            }
-            return prevState;
-          });
-        }
+      console.log('🔄 Buscando dados do lucro diretamente do Supabase...');
+
+      const { data, error } = await supabase
+        .from('demonstrativo_financeiro')
+        .select('value, percentage')
+        .eq('description', 'LUCRO')
+        .single();
+
+      if (error) {
+        console.error('❌ Erro ao buscar dados do lucro:', error);
+        return;
+      }
+
+      if (data && data.value !== undefined) {
+        const novoLucroProjetado = `R$ ${Math.abs(data.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+        const novaMargemLucroProjetada = data.percentage || '0%';
+
+        setLocalStatsData(prevState => {
+          // Verificar se os valores são diferentes antes de atualizar o estado
+          if (novoLucroProjetado !== prevState.lucroProjetado ||
+              novaMargemLucroProjetada !== prevState.margemLucroProjetada) {
+            console.log('✅ Atualizando dados do balanço do Supabase:', {
+              lucroProjetado: novoLucroProjetado,
+              margemLucroProjetada: novaMargemLucroProjetada
+            });
+
+            return {
+              lucroProjetado: novoLucroProjetado,
+              margemLucroProjetada: novaMargemLucroProjetada
+            };
+          }
+          return prevState;
+        });
       }
     } catch (error) {
-      console.error('Erro ao carregar dados do localStorage:', error);
+      console.error('❌ Erro ao carregar dados do Supabase:', error);
     }
   }, []);
 
-  // Função para monitorar mudanças no localStorage
+  // Função para monitorar mudanças no Supabase em tempo real
   useEffect(() => {
-    // Função para lidar com mudanças no localStorage
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'balanco-financial-data') {
-        console.log('Detectada alteração no localStorage do balanço');
-        loadBalancoData();
-      }
-    };
+    // Configurar subscription para mudanças na tabela demonstrativo_financeiro
+    const channel = supabase
+      .channel('balanco-lucro-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuta todos os eventos (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'demonstrativo_financeiro',
+          filter: 'description=eq.LUCRO'
+        },
+        (payload) => {
+          console.log('🔄 Detectada mudança no lucro do balanço:', payload);
+          // Atualizar dados quando houver mudança no lucro
+          loadBalancoDataFromSupabase();
+        }
+      )
+      .subscribe();
 
-    // Registrar o listener para o evento de storage
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Verificar periodicamente os dados do balanço (a cada 5 segundos)
+    // Verificar periodicamente os dados do balanço (a cada 30 segundos)
     const checkInterval = setInterval(() => {
-      loadBalancoData();
-    }, 5000);
+      loadBalancoDataFromSupabase();
+    }, 30000);
 
     // Limpar os listeners quando o componente for desmontado
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      supabase.removeChannel(channel);
       clearInterval(checkInterval);
     };
-  }, [loadBalancoData]);
+  }, [loadBalancoDataFromSupabase]);
 
   // Flag para controlar se já fizemos a carga inicial
   const initialLoadDone = useRef(false);
@@ -135,38 +152,38 @@ export default function Dashboard() {
     // Evitar múltiplas cargas iniciais
     if (initialLoadDone.current) return;
     
-    // Carregar dados do localStorage primeiro
-    loadBalancoData();
-    
+    // Carregar dados do Supabase primeiro
+    loadBalancoDataFromSupabase();
+
     // Forçar a atualização de dados ao carregar a página
     const loadData = async () => {
       try {
         console.log('Iniciando carregamento inicial do Dashboard');
-        
+
         // Forçar a atualização dos dados do dashboard
         await updateDashboardData();
-        
+
         // Garantir que os dados do balanço sejam carregados após atualização do dashboard
-        loadBalancoData();
-        
+        loadBalancoDataFromSupabase();
+
         // Definir dataLoaded como true após os dados estarem carregados
         setTimeout(() => {
           setAnimateCharts(true);
           setDataLoaded(true);
         }, 300);
-        
+
         console.log('Carregamento inicial do Dashboard concluído');
-        
+
         // Marcar que a carga inicial foi concluída
         initialLoadDone.current = true;
       } catch (error) {
         console.error('Erro ao atualizar dashboard:', error);
         toast.error('Erro ao carregar dados do dashboard');
-        
+
         // Mesmo em caso de erro, tentar mostrar os dados do balanço
-        loadBalancoData();
+        loadBalancoDataFromSupabase();
         setDataLoaded(true);
-        
+
         // Marcar que a carga inicial foi concluída mesmo com erro
         initialLoadDone.current = true;
       }
@@ -176,7 +193,7 @@ export default function Dashboard() {
 
     // Atualizar dados a cada 5 minutos
     const interval = setInterval(() => {
-      loadBalancoData(); // Apenas atualizamos os dados do balanço periodicamente
+      loadBalancoDataFromSupabase(); // Atualizamos os dados do balanço periodicamente
     }, 300000);
 
     return () => {
