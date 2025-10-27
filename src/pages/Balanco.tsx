@@ -223,18 +223,32 @@ export default function Balanco() {
     }
   }, [editingCell]);
 
-  // Calcular o total da receita (somente o valor de RECEITA)
+  // Calcular o total da receita (RECEITA + EXTRAS - PERDAS)
   const calculateReceitaTotal = () => {
-    // RECEITA já tem as perdas subtraídas diretamente
     const receitaItem = financialData.find(item => item.description === 'RECEITA');
-    return receitaItem ? receitaItem.value : 0;
+    const extrasItem = financialData.find(item => item.description === 'EXTRAS');
+    const perdasItem = financialData.find(item => item.description === 'PERDAS');
+    
+    const receita = receitaItem ? receitaItem.value : 0;
+    const extras = extrasItem ? extrasItem.value : 0;
+    const perdas = perdasItem ? perdasItem.value : 0;
+    
+    return receita + extras - Math.abs(perdas);
   };
 
   // Calcular totais para as métricas principais (usando valores reais, não Math.abs)
   const calcularDespesasTotal = () => {
+<<<<<<< HEAD
     // Incluir tanto itens quanto headers da categoria ENCERRAMENTO
     const itensEncerramento = financialData.filter(item => 
       item.category === 'ENCERRAMENTO' && (item.type === 'item' || item.type === 'header')
+=======
+    // Incluir tanto itens quanto headers da categoria ENCERRAMENTO, exceto PERDAS
+    const itensEncerramento = financialData.filter(item => 
+      item.category === 'ENCERRAMENTO' && 
+      (item.type === 'item' || item.type === 'header') &&
+      item.description !== 'PERDAS'
+>>>>>>> faae99c8309cd29a8671a540e24ce457432bc80a
     );
     const total = itensEncerramento.reduce((acc, cur) => acc + cur.value, 0);
     return total;
@@ -255,25 +269,14 @@ export default function Balanco() {
     return receita;
   };
 
-  // Calcular o Lucro e a Margem de Lucro (subtrai todos os itens abaixo de EXTRAS pelo valor absoluto)
+  // Calcular o Lucro usando os valores dos cards (Receita Total - Despesas - Reservas)
   const calculateLucro = () => {
-    // Encontrar o índice do item EXTRAS
-    const extrasIndex = financialData.findIndex(item => item.description === 'EXTRAS');
+    const receitaTotal = calculateReceitaTotal();
+    const despesasTotal = Math.abs(calcularDespesasTotal()); // Usar valor absoluto das despesas
+    const reservasTotal = Math.abs(calcularReservasTotal()); // Usar valor absoluto das reservas
     
-    // Somar os valores absolutos de todos os itens abaixo de EXTRAS (exceto spacers e o próprio Lucro)
-    // Agora incluindo PERDAS como despesa
-    const totalDespesas = financialData
-      .slice(extrasIndex + 1)
-      .filter(item => 
-        item.type !== 'spacer' && 
-        item.description !== 'LUCRO'
-      )
-      .reduce((acc, cur) => acc + Math.abs(cur.value || 0), 0);
-
-    const receitaBruta = calculateReceitaBruta();
-    // Garantir que o lucro seja sempre um valor positivo para exibição
-    const lucro = receitaBruta - totalDespesas;
-    const percentage = receitaBruta !== 0 ? (lucro / receitaBruta) * 100 : 0;
+    const lucro = receitaTotal - despesasTotal - reservasTotal;
+    const percentage = receitaTotal !== 0 ? (lucro / receitaTotal) * 100 : 0;
 
     return {
       value: lucro, // Mantemos o valor original (pode ser negativo) para cálculos
@@ -647,6 +650,39 @@ export default function Balanco() {
     }
   };
 
+<<<<<<< HEAD
+=======
+  // Função para remover marcação manual (temporária)
+  const removeManualEditFlag = async (itemDescription: string) => {
+    try {
+      console.log(`🔓 Removendo marcação manual de "${itemDescription}" no Supabase`);
+      
+      const { error } = await supabase
+        .from('demonstrativo_financeiro')
+        .update({ 
+          text_color: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('description', itemDescription);
+
+      if (error) throw error;
+      
+      console.log(`✅ Marcação manual removida de "${itemDescription}" no Supabase`);
+      
+      // Recarregar dados para atualizar o estado local
+      setTimeout(async () => {
+        const updatedData = await loadFromSupabase();
+        if (updatedData && updatedData.length > 0) {
+          setFinancialData(updatedData);
+        }
+      }, 500);
+      
+    } catch (error) {
+      console.error('❌ Erro ao remover marcação manual no Supabase:', error);
+    }
+  };
+
+>>>>>>> faae99c8309cd29a8671a540e24ce457432bc80a
   // Estado para rastrear itens editados manualmente (baseado nos dados do Supabase)
   const [manuallyEditedItems, setManuallyEditedItems] = useState<Set<string>>(new Set());
   
@@ -851,14 +887,14 @@ export default function Balanco() {
     try {
       // Lista de todos os centros de custo específicos que queremos buscar
       const centrosCustoEspecificos = [
-        'Funcionários',
-        'Pró-Labore',
-        'Marketing',
+        'Centro de Custo - Funcionários',
+        'Centro de Custo - Pró-Labore',
+        'Centro de Custo - Marketing',
         'Tarifa Bancária',
         'Centro de Custo Fixo',
         'Centro de Custo Variável',
-        'Centro de Custo Certificado Digital',
-        'Recrutamento e Seleção'
+        'Centro de Custo - Certificado Digital',
+        'Centro de Custo - Recrutamento e Seleção'
       ];
 
       // Busca TODOS os registros da tabela de custos
@@ -888,6 +924,10 @@ export default function Balanco() {
       console.log('Totais calculados:', totais);
       console.log('Valor OUTROS:', totalOutros);
       console.log('Itens editados manualmente:', manuallyEditedItems);
+<<<<<<< HEAD
+=======
+      console.log('📋 Valores únicos de centro_custo na base:', [...new Set(data.map(item => item.centro_custo))].filter(Boolean));
+>>>>>>> faae99c8309cd29a8671a540e24ce457432bc80a
 
       // Atualiza os valores na tabela de balanço (como valores negativos)
       setFinancialData(prev => {
@@ -908,17 +948,26 @@ export default function Balanco() {
           
           // Mapeamento entre as descrições na tabela de balanço e os centros de custo
           const descriptionToCentroCusto = {
+<<<<<<< HEAD
             'Funcionários': 'Funcionários',
             'Pró-labore': 'Pró-Labore', // Tabela usa 'Pró-labore', Supabase usa 'Pró-Labore'
             'Marketing': 'Marketing',
+=======
+            'Funcionários': 'Centro de Custo - Funcionários',
+            'Pró-labore': 'Centro de Custo - Pró-Labore', // Tabela usa 'Pró-labore', Supabase usa 'Centro de Custo - Pró-Labore'
+            'Marketing': 'Centro de Custo - Marketing',
+>>>>>>> faae99c8309cd29a8671a540e24ce457432bc80a
             'Tarifa Bancária': 'Tarifa Bancária',
             'Centro de Custo Fixo': 'Centro de Custo Fixo',
             'Centro de Custo Variável': 'Centro de Custo Variável',
-            'Centro de Custo Certificado Digital': 'Centro de Custo Certificado Digital',
-            'Recrutamento e Seleção': 'Recrutamento e Seleção'
+            'Centro de Custo Certificado Digital': 'Centro de Custo - Certificado Digital',
+            'Recrutamento e Seleção': 'Centro de Custo - Recrutamento e Seleção'
           };
 
           const centroCusto = descriptionToCentroCusto[item.description];
+          if (item.description === 'Pró-labore') {
+            console.log(`🔍 Debug Pró-labore: centroCusto="${centroCusto}", total=${totais[centroCusto]}, temValor=${totais[centroCusto] !== undefined}`);
+          }
           if (centroCusto && totais[centroCusto] !== undefined) {
             console.log(`Atualizando "${item.description}" com valor do Supabase: -${totais[centroCusto]}`);
             return { ...item, value: -totais[centroCusto] };
@@ -1040,15 +1089,11 @@ export default function Balanco() {
       setFinancialData(prev => {
         const newData = [...prev];
         
-        // Obter o valor atual de EXTRAS
-        const extrasItem = newData.find(item => item.description === 'EXTRAS');
-        const extrasValue = extrasItem ? extrasItem.value : 0;
-        
-        // Atualizar RECEITA (id: 1) com o valor base + honorários - perdas + extras
+        // Atualizar RECEITA (id: 1) com o valor base + honorários - perdas (SEM EXTRAS)
         const receitaIndex = newData.findIndex(item => item.id === 1);
         if (receitaIndex !== -1) {
-          const valorFinal = valorBase + totalHonorariosEntrada - totalPerdasSaida + extrasValue;
-          console.log(`Atualizando RECEITA para ${valorFinal} (${valorBase} + ${totalHonorariosEntrada} - ${totalPerdasSaida} + ${extrasValue})`);
+          const valorFinal = valorBase + totalHonorariosEntrada - totalPerdasSaida;
+          console.log(`Atualizando RECEITA para ${valorFinal} (${valorBase} + ${totalHonorariosEntrada} - ${totalPerdasSaida})`);
           newData[receitaIndex] = {
             ...newData[receitaIndex],
             value: valorFinal
@@ -1126,9 +1171,22 @@ export default function Balanco() {
         const supabaseData = await loadFromSupabase();
         
         if (supabaseData && supabaseData.length > 0) {
+<<<<<<< HEAD
           console.log('📥 Dados carregados do Supabase com sucesso');
           setIsExternalUpdate(true);
           setFinancialData(supabaseData);
+=======
+                  console.log('📥 Dados carregados do Supabase com sucesso');
+        setIsExternalUpdate(true);
+        setFinancialData(supabaseData);
+        
+        // Remover marcação manual do Pró-labore para permitir atualização automática
+        const proLaboreItem = supabaseData.find(item => item.description === 'Pró-labore');
+        if (proLaboreItem && proLaboreItem.textColor === 'MANUALLY_EDITED') {
+          console.log('🔓 Removendo marcação manual do Pró-labore para permitir atualização automática');
+          await removeManualEditFlag('Pró-labore');
+        }
+>>>>>>> faae99c8309cd29a8671a540e24ce457432bc80a
         } else {
           console.log('🚀 Supabase vazio, inicializando com dados padrão...');
           setFinancialData(financialDataInitial);
@@ -1296,7 +1354,7 @@ export default function Balanco() {
         <StatCard
           title="Receita Total"
           value={`R$ ${receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-          description="Receita bruta + extras"
+          description="Receita + extras - perdas"
           icon={<DollarSign size={18} className="text-emerald-500" />}
           className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-100 dark:border-emerald-900/30"
         />
